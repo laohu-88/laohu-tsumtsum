@@ -4,7 +4,8 @@ const FIRST_SPRITE_ID = 76;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 5;
 const SPAWN_INTERVAL_MS = 880;
-const BALL_RADIUS = 46;
+const BALL_RADIUS = 52;
+const BODY_RADIUS = 43;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
@@ -49,10 +50,11 @@ let textures = [];
 let selectedSpriteIds = [];
 let lineGlow;
 let lineCore;
+let lineNodes;
 let particleLayer;
 let scoreText;
 let popSound;
-let selectSound;
+let linkSound;
 let selectedBalls = [];
 let selectedBodyIds = new Set();
 let particles = [];
@@ -67,8 +69,10 @@ let audioUnlocked = false;
 let wakeLock = null;
 let audioContext = null;
 let popBuffer = null;
-let selectBuffer = null;
+let linkBuffer = null;
 let keepAwakeVideo = null;
+let keepAwakeCanvas = null;
+let keepAwakeTimer = null;
 let feedbackShakeFrames = 0;
 let feedbackShakeStrength = 0;
 let audioPrimed = false;
@@ -290,11 +294,11 @@ function spawnBall() {
   const x = SPAWN_X_CENTER + (Math.random() - 0.5) * SPAWN_X_RANGE;
   const y = 134 + Math.random() * 8;
   const textureEntry = textures[Math.floor(Math.random() * textures.length)];
-  const body = Bodies.circle(x, y, BALL_RADIUS, {
-    restitution: 0.2,
-    friction: 0.74,
-    frictionAir: 0.026,
-    density: 0.0012,
+  const body = Bodies.circle(x, y, BODY_RADIUS, {
+    restitution: 0.12,
+    friction: 0.86,
+    frictionAir: 0.034,
+    density: 0.00145,
   });
 
   Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.18);
@@ -446,8 +450,8 @@ async function loadAudioBuffer(path) {
 }
 
 async function loadSoundBuffers() {
-  if (!selectBuffer) {
-    selectBuffer = await loadAudioBuffer("pop.wav");
+  if (!linkBuffer) {
+    linkBuffer = await loadAudioBuffer("link.wav");
   }
 
   if (!popBuffer) {
@@ -468,12 +472,10 @@ function setupKeepAwakeVideo() {
     return;
   }
 
-  const canvas = document.createElement("canvas");
-  canvas.width = 2;
-  canvas.height = 2;
-  const context = canvas.getContext("2d");
-  context.fillStyle = "#000";
-  context.fillRect(0, 0, 2, 2);
+  keepAwakeCanvas = document.createElement("canvas");
+  keepAwakeCanvas.width = 2;
+  keepAwakeCanvas.height = 2;
+  updateKeepAwakeFrame();
 
   keepAwakeVideo = document.createElement("video");
   keepAwakeVideo.muted = true;
@@ -481,12 +483,35 @@ function setupKeepAwakeVideo() {
   keepAwakeVideo.playsInline = true;
   keepAwakeVideo.setAttribute("playsinline", "");
   keepAwakeVideo.style.position = "fixed";
+  keepAwakeVideo.style.left = "-2px";
+  keepAwakeVideo.style.top = "-2px";
   keepAwakeVideo.style.width = "1px";
   keepAwakeVideo.style.height = "1px";
-  keepAwakeVideo.style.opacity = "0";
+  keepAwakeVideo.style.opacity = "0.001";
   keepAwakeVideo.style.pointerEvents = "none";
-  keepAwakeVideo.srcObject = canvas.captureStream(1);
+  keepAwakeVideo.srcObject = keepAwakeCanvas.captureStream(1);
   document.body.appendChild(keepAwakeVideo);
+
+  keepAwakeTimer = window.setInterval(() => {
+    updateKeepAwakeFrame();
+    if (document.visibilityState === "visible") {
+      requestWakeLock();
+      playKeepAwakeVideo();
+    }
+  }, 12000);
+}
+
+function updateKeepAwakeFrame() {
+  const context = keepAwakeCanvas?.getContext("2d");
+  if (!context) {
+    return;
+  }
+
+  const pulse = Math.floor(Date.now() / 1000) % 2;
+  context.fillStyle = pulse ? "#10151c" : "#111820";
+  context.fillRect(0, 0, 2, 2);
+  context.fillStyle = pulse ? "#ffffff" : "#ffe680";
+  context.fillRect(pulse, 0, 1, 1);
 }
 
 async function unlockAudio() {
@@ -504,7 +529,7 @@ async function unlockAudio() {
     audioUnlocked = false;
   }
 
-  unlockHtmlAudio(selectSound);
+  unlockHtmlAudio(linkSound);
   unlockHtmlAudio(popSound);
 }
 
@@ -546,7 +571,7 @@ function activateMobileSession() {
 function primeAudioFromGesture() {
   const context = ensureAudioContextSync();
   if (!context) {
-    unlockHtmlAudio(selectSound);
+    unlockHtmlAudio(linkSound);
     unlockHtmlAudio(popSound);
     return;
   }
@@ -696,22 +721,23 @@ function triggerBallShake(ball, strength) {
 function redrawConnectionLine() {
   lineGlow.clear();
   lineCore.clear();
+  lineNodes.clear();
 
   if (selectedBalls.length === 0) {
     return;
   }
 
   lineGlow.lineStyle({
-    width: 22,
-    color: 0xff5bd8,
-    alpha: 0.34,
+    width: 34,
+    color: 0x12d8ff,
+    alpha: 0.48,
     cap: "round",
     join: "round",
   });
   lineCore.lineStyle({
-    width: 9,
-    color: 0xff4fd8,
-    alpha: 0.96,
+    width: 14,
+    color: 0xffff66,
+    alpha: 0.98,
     cap: "round",
     join: "round",
   });
@@ -735,6 +761,16 @@ function redrawConnectionLine() {
       lineCore.lineTo(dragPointerPosition.x, dragPointerPosition.y);
     }
   }
+
+  for (const ball of selectedBalls) {
+    const point = ball.body.position;
+    lineNodes.lineStyle(8, 0x12d8ff, 0.58);
+    lineNodes.beginFill(0xffff66, 0.28);
+    lineNodes.drawCircle(point.x, point.y, BALL_RADIUS * 0.78);
+    lineNodes.endFill();
+    lineNodes.lineStyle(3, 0xffffff, 0.92);
+    lineNodes.drawCircle(point.x, point.y, BALL_RADIUS * 0.64);
+  }
 }
 
 function clearSelection() {
@@ -747,6 +783,7 @@ function clearSelection() {
   dragPointerPosition = null;
   lineGlow.clear();
   lineCore.clear();
+  lineNodes.clear();
 }
 
 function handlePointerDown(event) {
@@ -755,7 +792,6 @@ function handlePointerDown(event) {
   }
 
   activateMobileSession();
-  playSyntheticPop(0.035, 300, 0.025);
   isDragging = true;
   clearSelection();
   const point = getPointerPosition(event);
@@ -860,8 +896,7 @@ function playSyntheticPop(volume = 0.18, frequency = 420, duration = 0.055) {
 }
 
 function playSelectSound() {
-  playSyntheticPop(0.18, 620, 0.045);
-  playSoundBuffer(selectBuffer, 0.36) || playHtmlSound(selectSound);
+  playSoundBuffer(linkBuffer, 0.22) || playHtmlSound(linkSound);
 }
 
 function playPopSound() {
@@ -928,6 +963,7 @@ function explodeSelectedBalls() {
   dragPointerPosition = null;
   lineGlow.clear();
   lineCore.clear();
+  lineNodes.clear();
 }
 
 function updateParticles() {
@@ -958,14 +994,17 @@ function clearParticles() {
 function createInteractionLayers() {
   lineGlow = new PIXI.Graphics();
   lineCore = new PIXI.Graphics();
+  lineNodes = new PIXI.Graphics();
   particleLayer = new PIXI.Container();
 
   lineGlow.zIndex = 8;
   lineCore.zIndex = 9;
-  particleLayer.zIndex = 10;
+  lineNodes.zIndex = 10;
+  particleLayer.zIndex = 11;
 
   app.stage.addChild(lineGlow);
   app.stage.addChild(lineCore);
+  app.stage.addChild(lineNodes);
   app.stage.addChild(particleLayer);
 }
 
@@ -983,7 +1022,6 @@ function setupInput() {
 function setupAudioUnlockEvents() {
   const unlock = () => {
     primeAudioFromGesture();
-    playSyntheticPop(0.05, 260, 0.025);
   };
   const options = { capture: true, passive: true };
 
@@ -993,10 +1031,10 @@ function setupAudioUnlockEvents() {
 }
 
 function setupAudio() {
-  selectSound = new Audio("pop.wav");
-  selectSound.preload = "auto";
-  selectSound.volume = 0.38;
-  selectSound.load();
+  linkSound = new Audio("link.wav");
+  linkSound.preload = "auto";
+  linkSound.volume = 0.18;
+  linkSound.load();
 
   popSound = new Audio("pop_bomb.wav");
   popSound.preload = "auto";

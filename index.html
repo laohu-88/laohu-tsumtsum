@@ -20,6 +20,9 @@
         background: #10151c;
         font-family: Arial, "Microsoft YaHei", sans-serif;
         touch-action: none;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
 
       #game-root {
@@ -39,6 +42,9 @@
         max-width: 100vw;
         max-height: 100vh;
         box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
 
       .loading {
@@ -62,6 +68,8 @@
     <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
     <script src="./game.js"></script>
     <script>
+      window.addEventListener("contextmenu", (event) => event.preventDefault(), { capture: true });
+      window.addEventListener("selectstart", (event) => event.preventDefault(), { capture: true });
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("./service-worker.js").catch(() => {});
