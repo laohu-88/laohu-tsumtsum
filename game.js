@@ -3,8 +3,8 @@ const TOTAL_SPRITES = 126;
 const FIRST_SPRITE_ID = 76;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 5;
-const SPAWN_INTERVAL_MS = 520;
-const BALL_RADIUS = 31;
+const SPAWN_INTERVAL_MS = 880;
+const BALL_RADIUS = 35;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
@@ -13,7 +13,7 @@ const MAX_BALLS = 120;
 const WALL_THICKNESS = 42;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
 const HUD_TOP = 54;
-const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 10;
+const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 46;
 
 const BOTTLE = {
   leftNeckTop: { x: 132, y: 96 },
@@ -22,10 +22,10 @@ const BOTTLE = {
   rightMouth: { x: 348, y: 210 },
   leftShoulder: { x: 34, y: 318 },
   rightShoulder: { x: 396, y: 318 },
-  leftLowerSide: { x: 18, y: 806 },
-  rightLowerSide: { x: 412, y: 806 },
-  leftHeel: { x: 44, y: 868 },
-  rightHeel: { x: 386, y: 868 },
+  leftLowerSide: { x: 18, y: 782 },
+  rightLowerSide: { x: 412, y: 782 },
+  leftHeel: { x: 44, y: 836 },
+  rightHeel: { x: 386, y: 836 },
   leftFloor: { x: 98, y: BOTTOM_SAFE_Y },
   rightFloor: { x: 332, y: BOTTOM_SAFE_Y },
 };
@@ -288,7 +288,7 @@ function spawnBall() {
   const body = Bodies.circle(x, y, BALL_RADIUS, {
     restitution: 0.2,
     friction: 0.74,
-    frictionAir: 0.012,
+    frictionAir: 0.026,
     density: 0.0012,
   });
 
@@ -337,6 +337,11 @@ function triggerHaptic(pattern = 18) {
   vibrate(pattern);
 
   const haptics = window.Capacitor?.Plugins?.Haptics;
+  if (haptics?.vibrate) {
+    const duration = Array.isArray(pattern) ? Math.max(...pattern) : pattern;
+    haptics.vibrate({ duration }).catch(() => {});
+  }
+
   if (haptics?.impact) {
     haptics.impact({ style: "medium" }).catch(() => {});
   }
@@ -460,7 +465,7 @@ async function unlockAudio() {
 }
 
 function activateMobileSession() {
-  unlockAudio();
+  unlockAudio().catch(() => {});
   requestWakeLock();
   playKeepAwakeVideo();
 }
@@ -573,7 +578,7 @@ function addSelectedBall(ball) {
   selectedBalls.push(ball);
   selectedBodyIds.add(ball.body.id);
   ball.view.scale.set(1.14);
-  triggerHaptic(18);
+  triggerHaptic(selectedBalls.length === 1 ? 16 : 26);
   redrawConnectionLine();
 }
 
@@ -682,6 +687,7 @@ function handlePointerUp() {
   dragPointerPosition = null;
 
   if (selectedBalls.length >= 2) {
+    playPopSound();
     explodeSelectedBalls();
   } else {
     clearSelection();
@@ -696,7 +702,7 @@ function playPopSound() {
     gain.gain.value = 0.85;
     source.connect(gain);
     gain.connect(audioContext.destination);
-    source.start(0);
+    source.start(audioContext.currentTime);
     return;
   }
 
@@ -750,7 +756,6 @@ function burstParticles(x, y) {
 function explodeSelectedBalls() {
   const removing = new Set(selectedBalls.map((ball) => ball.body.id));
   triggerHaptic([28, 24, 52]);
-  playPopSound();
 
   for (const ball of selectedBalls) {
     burstParticles(ball.body.position.x, ball.body.position.y);
@@ -822,6 +827,7 @@ function setupAudio() {
   popSound.preload = "auto";
   popSound.volume = 0.72;
   popSound.load();
+  loadPopBuffer().catch(() => {});
 }
 
 function syncSprites() {
@@ -912,7 +918,7 @@ function updateScoreText() {
 
 function startPhysics() {
   engine = Engine.create({
-    gravity: { x: 0, y: 0.82, scale: 0.001 },
+    gravity: { x: 0, y: 0.46, scale: 0.001 },
     positionIterations: 10,
     velocityIterations: 8,
     constraintIterations: 4,
