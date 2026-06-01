@@ -16,6 +16,86 @@ const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 54;
+const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
+
+const LEVELS = [
+  {
+    id: 1,
+    name: "第一关",
+    subtitle: "红色松松训练",
+    duration: 60,
+    goals: { score: 500, targetClears: 10 },
+    targetLabel: "红色",
+    targetWeight: 0.3,
+    background: { top: 0x1e9d8f, bottom: 0x143247, accent: 0xffd66e, glow: 0x8ff4ff },
+    obstacles: [],
+  },
+  {
+    id: 2,
+    name: "第二关",
+    subtitle: "45秒五连消",
+    duration: 45,
+    goals: { combo: 5 },
+    targetWeight: 0.18,
+    background: { top: 0x334a8f, bottom: 0x171c35, accent: 0xff8fb3, glow: 0x72f0ff },
+    obstacles: [
+      { type: "bumper", x: 130, y: 420, radius: 28 },
+      { type: "bumper", x: 300, y: 508, radius: 30 },
+      { type: "bar", x: 215, y: 628, width: 152, height: 18, angle: -0.18 },
+    ],
+  },
+  {
+    id: 3,
+    name: "第三关",
+    subtitle: "连击和红色双目标",
+    duration: 70,
+    goals: { score: 1200, combo: 6, targetClears: 12 },
+    targetLabel: "红色",
+    targetWeight: 0.34,
+    background: { top: 0x5e3f9d, bottom: 0x1f1631, accent: 0xf8bd5b, glow: 0x9af59a },
+    obstacles: [
+      { type: "pin", x: 112, y: 390, radius: 18 },
+      { type: "pin", x: 318, y: 390, radius: 18 },
+      { type: "bumper", x: 215, y: 544, radius: 34 },
+      { type: "bar", x: 140, y: 694, width: 126, height: 16, angle: 0.23 },
+      { type: "bar", x: 290, y: 694, width: 126, height: 16, angle: -0.23 },
+    ],
+  },
+  {
+    id: 4,
+    name: "第四关",
+    subtitle: "窄路高分挑战",
+    duration: 55,
+    goals: { score: 1600, clears: 24 },
+    targetWeight: 0.16,
+    background: { top: 0x164f77, bottom: 0x111d24, accent: 0xfff176, glow: 0xff9f7a },
+    obstacles: [
+      { type: "bar", x: 152, y: 372, width: 132, height: 18, angle: 0.32 },
+      { type: "bar", x: 278, y: 372, width: 132, height: 18, angle: -0.32 },
+      { type: "bumper", x: 116, y: 568, radius: 26 },
+      { type: "bumper", x: 314, y: 568, radius: 26 },
+      { type: "pin", x: 215, y: 724, radius: 22 },
+    ],
+  },
+  {
+    id: 5,
+    name: "第五关",
+    subtitle: "最终瓶中派对",
+    duration: 75,
+    goals: { score: 2500, combo: 7, targetClears: 18 },
+    targetLabel: "红色",
+    targetWeight: 0.38,
+    background: { top: 0x7a3047, bottom: 0x20121a, accent: 0x73f7cf, glow: 0xffd66e },
+    obstacles: [
+      { type: "bumper", x: 110, y: 386, radius: 27 },
+      { type: "bumper", x: 320, y: 386, radius: 27 },
+      { type: "pin", x: 215, y: 482, radius: 20 },
+      { type: "bar", x: 150, y: 604, width: 132, height: 17, angle: -0.28 },
+      { type: "bar", x: 280, y: 604, width: 132, height: 17, angle: 0.28 },
+      { type: "bumper", x: 215, y: 752, radius: 30 },
+    ],
+  },
+];
 
 const BOTTLE = {
   leftNeckTop: { x: 132, y: 96 },
@@ -54,6 +134,9 @@ let lineCore;
 let lineNodes;
 let particleLayer;
 let scoreText;
+let timeText;
+let goalText;
+let levelText;
 let popSound;
 let linkSound;
 let selectedBalls = [];
@@ -77,6 +160,21 @@ let keepAwakeTimer = null;
 let feedbackShakeFrames = 0;
 let feedbackShakeStrength = 0;
 let audioPrimed = false;
+let backgroundLayer;
+let obstacleLayer;
+let levelSelectContainer;
+let resultOverlay;
+let levelObstacleBodies = [];
+let levelObstacleViews = [];
+let unlockedLevel = 1;
+let currentLevel = null;
+let currentLevelTargetSpriteId = null;
+let levelTimeLeftMs = 0;
+let levelStats = {
+  targetClears: 0,
+  clears: 0,
+  maxCombo: 0,
+};
 
 const loadingEl = document.getElementById("loading");
 const gameRoot = document.getElementById("game-root");
@@ -101,6 +199,51 @@ function pickRoundSprites() {
   }
 
   return shuffle(ids).slice(0, PARTICIPANT_COUNT);
+}
+
+function loadProgress() {
+  const saved = Number(window.localStorage.getItem(PROGRESS_STORAGE_KEY));
+  if (Number.isFinite(saved) && saved >= 1) {
+    unlockedLevel = Math.min(LEVELS.length, saved);
+  }
+}
+
+function saveProgress(levelId) {
+  unlockedLevel = Math.min(LEVELS.length, Math.max(unlockedLevel, levelId + 1));
+  window.localStorage.setItem(PROGRESS_STORAGE_KEY, String(unlockedLevel));
+}
+
+function formatTime(ms) {
+  return `${Math.max(0, Math.ceil(ms / 1000))}s`;
+}
+
+function describeGoals(level) {
+  const goals = [];
+  if (level.goals.score) {
+    goals.push(`${level.goals.score}分`);
+  }
+  if (level.goals.targetClears) {
+    goals.push(`${level.targetLabel || "目标"}松松x${level.goals.targetClears}`);
+  }
+  if (level.goals.combo) {
+    goals.push(`${level.goals.combo}连消`);
+  }
+  if (level.goals.clears) {
+    goals.push(`消除${level.goals.clears}个`);
+  }
+  return goals.join(" / ");
+}
+
+function isLevelComplete() {
+  if (!currentLevel) {
+    return false;
+  }
+
+  const goals = currentLevel.goals;
+  return (!goals.score || score >= goals.score)
+    && (!goals.targetClears || levelStats.targetClears >= goals.targetClears)
+    && (!goals.combo || levelStats.maxCombo >= goals.combo)
+    && (!goals.clears || levelStats.clears >= goals.clears);
 }
 
 async function createPixiApp() {
@@ -146,25 +289,37 @@ function resizeGame() {
 }
 
 function drawBackground() {
+  if (backgroundLayer) {
+    backgroundLayer.destroy({ children: true });
+  }
+
+  const theme = currentLevel?.background || LEVELS[0].background;
+  backgroundLayer = new PIXI.Container();
+  backgroundLayer.zIndex = 0;
+
   const bg = new PIXI.Graphics();
-  bg.beginFill(0x162030);
+  bg.beginFill(theme.bottom);
   bg.drawRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
   bg.endFill();
 
-  bg.beginFill(0x24324a, 0.82);
+  bg.beginFill(theme.top, 0.82);
   bg.drawRoundedRect(18, 18, DESIGN_WIDTH - 36, DESIGN_HEIGHT - 36, 26);
   bg.endFill();
 
-  bg.beginFill(0xffd677, 0.18);
+  bg.beginFill(theme.accent, 0.22);
   bg.drawCircle(86, 118, 116);
   bg.endFill();
 
-  bg.beginFill(0x65d7ff, 0.12);
+  bg.beginFill(theme.glow, 0.16);
   bg.drawCircle(348, 202, 92);
   bg.endFill();
 
-  bg.zIndex = 0;
-  app.stage.addChild(bg);
+  bg.beginFill(0xffffff, 0.06);
+  bg.drawCircle(220, 780, 196);
+  bg.endFill();
+
+  backgroundLayer.addChild(bg);
+  app.stage.addChild(backgroundLayer);
 }
 
 function drawBottle() {
@@ -269,7 +424,7 @@ async function loadRoundTextures() {
   });
 }
 
-function makeCircularSprite(texture) {
+function makeCircularSprite(texture, isTarget = false) {
   const sprite = new PIXI.Sprite(texture);
   sprite.anchor.set(0.5);
   sprite.width = BALL_RADIUS * 2;
@@ -284,6 +439,16 @@ function makeCircularSprite(texture) {
   container.addChild(sprite);
   container.addChild(mask);
   sprite.mask = mask;
+
+  if (isTarget) {
+    const ring = new PIXI.Graphics();
+    ring.lineStyle(7, 0xff4b5f, 0.96);
+    ring.drawCircle(0, 0, BALL_RADIUS - 4);
+    ring.lineStyle(3, 0xffffff, 0.72);
+    ring.drawCircle(0, 0, BALL_RADIUS - 12);
+    container.addChild(ring);
+  }
+
   return container;
 }
 
@@ -294,7 +459,10 @@ function spawnBall() {
 
   const x = SPAWN_X_CENTER + (Math.random() - 0.5) * SPAWN_X_RANGE;
   const y = 134 + Math.random() * 8;
-  const textureEntry = textures[Math.floor(Math.random() * textures.length)];
+  let textureEntry = textures[Math.floor(Math.random() * textures.length)];
+  if (currentLevelTargetSpriteId && Math.random() < (currentLevel?.targetWeight || 0.2)) {
+    textureEntry = textures.find((entry) => entry.id === currentLevelTargetSpriteId) || textureEntry;
+  }
   const body = Bodies.circle(x, y, BODY_RADIUS, {
     restitution: 0.12,
     friction: 0.86,
@@ -305,7 +473,7 @@ function spawnBall() {
   Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.18);
   Composite.add(engine.world, body);
 
-  const view = makeCircularSprite(textureEntry.texture);
+  const view = makeCircularSprite(textureEntry.texture, textureEntry.id === currentLevelTargetSpriteId);
   view.zIndex = 3;
   app.stage.addChild(view);
   balls.push({ body, view, spriteId: textureEntry.id });
@@ -942,6 +1110,8 @@ function burstParticles(x, y) {
 
 function explodeSelectedBalls() {
   const removing = new Set(selectedBalls.map((ball) => ball.body.id));
+  const chainLength = selectedBalls.length;
+  const targetClears = selectedBalls.filter((ball) => ball.spriteId === currentLevelTargetSpriteId).length;
   triggerHaptic([90, 50, 130]);
 
   for (const ball of selectedBalls) {
@@ -953,13 +1123,21 @@ function explodeSelectedBalls() {
 
   balls = balls.filter((ball) => !removing.has(ball.body.id));
   score += removing.size * 100;
+  levelStats.clears += chainLength;
+  levelStats.targetClears += targetClears;
+  levelStats.maxCombo = Math.max(levelStats.maxCombo, chainLength);
   updateScoreText();
+  updateGoalText();
   selectedBalls = [];
   selectedBodyIds.clear();
   dragPointerPosition = null;
   lineGlow.clear();
   lineCore.clear();
   lineNodes.clear();
+
+  if (isLevelComplete()) {
+    finishLevel(true);
+  }
 }
 
 function updateParticles() {
@@ -1081,15 +1259,99 @@ function clearBalls() {
   balls = [];
 }
 
-async function restartGame() {
+function clearLevelObstacles() {
+  for (const body of levelObstacleBodies) {
+    Composite.remove(engine.world, body);
+  }
+  for (const view of levelObstacleViews) {
+    view.destroy({ children: true });
+  }
+  levelObstacleBodies = [];
+  levelObstacleViews = [];
+}
+
+function createObstacleView(obstacle) {
+  const view = new PIXI.Graphics();
+  view.lineStyle(4, 0xffffff, 0.55);
+  view.beginFill(0x0c121a, 0.68);
+
+  if (obstacle.type === "bar") {
+    view.drawRoundedRect(-obstacle.width / 2, -obstacle.height / 2, obstacle.width, obstacle.height, 8);
+  } else {
+    view.drawCircle(0, 0, obstacle.radius);
+  }
+
+  view.endFill();
+  view.beginFill(currentLevel?.background?.accent || 0xffd66e, 0.28);
+  if (obstacle.type === "bar") {
+    view.drawRoundedRect(-obstacle.width / 2 + 8, -obstacle.height / 2 + 4, obstacle.width - 16, 4, 2);
+  } else {
+    view.drawCircle(-obstacle.radius * 0.28, -obstacle.radius * 0.28, obstacle.radius * 0.34);
+  }
+  view.endFill();
+  view.position.set(obstacle.x, obstacle.y);
+  view.rotation = obstacle.angle || 0;
+  view.zIndex = 2;
+  return view;
+}
+
+function createLevelObstacles() {
+  clearLevelObstacles();
+  if (!obstacleLayer) {
+    obstacleLayer = new PIXI.Container();
+    obstacleLayer.zIndex = 2;
+    app.stage.addChild(obstacleLayer);
+  }
+
+  for (const obstacle of currentLevel?.obstacles || []) {
+    const body = obstacle.type === "bar"
+      ? Bodies.rectangle(obstacle.x, obstacle.y, obstacle.width, obstacle.height, {
+        isStatic: true,
+        angle: obstacle.angle || 0,
+        restitution: 0.45,
+        friction: 0.72,
+      })
+      : Bodies.circle(obstacle.x, obstacle.y, obstacle.radius, {
+        isStatic: true,
+        restitution: obstacle.type === "bumper" ? 0.88 : 0.38,
+        friction: 0.55,
+      });
+    const view = createObstacleView(obstacle);
+    Composite.add(engine.world, body);
+    obstacleLayer.addChild(view);
+    levelObstacleBodies.push(body);
+    levelObstacleViews.push(view);
+  }
+}
+
+async function startLevel(level) {
   gameStarted = false;
+  currentLevel = level;
+  currentLevelTargetSpriteId = null;
+  levelTimeLeftMs = level.duration * 1000;
+  levelStats = { targetClears: 0, clears: 0, maxCombo: 0 };
   spawnTimer = 0;
   clearBalls();
   clearParticles();
+  clearLevelObstacles();
   score = 0;
   updateScoreText();
+  updateGoalText();
+  drawBackground();
+  createLevelObstacles();
   await loadRoundTextures();
+  currentLevelTargetSpriteId = level.goals.targetClears ? selectedSpriteIds[0] : null;
+  hideLevelSelect();
+  hideResultOverlay();
+  updateHudForLevel();
   gameStarted = true;
+}
+
+async function restartGame() {
+  if (!currentLevel) {
+    return;
+  }
+  await startLevel(currentLevel);
 }
 
 function createHud() {
@@ -1110,6 +1372,16 @@ function createHud() {
   title.zIndex = 21;
   app.stage.addChild(title);
 
+  levelText = new PIXI.Text("关卡选择", {
+    fill: 0xcdf7ff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 13,
+    fontWeight: "700",
+  });
+  levelText.position.set(34, HUD_TOP + 38);
+  levelText.zIndex = 21;
+  app.stage.addChild(levelText);
+
   scoreText = new PIXI.Text("0", {
     fill: 0xfff176,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
@@ -1120,6 +1392,29 @@ function createHud() {
   scoreText.position.set(DESIGN_WIDTH / 2, HUD_TOP + 15);
   scoreText.zIndex = 21;
   app.stage.addChild(scoreText);
+
+  timeText = new PIXI.Text("0s", {
+    fill: 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 16,
+    fontWeight: "700",
+  });
+  timeText.anchor.set(0.5, 0);
+  timeText.position.set(DESIGN_WIDTH / 2, HUD_TOP + 39);
+  timeText.zIndex = 21;
+  app.stage.addChild(timeText);
+
+  goalText = new PIXI.Text("", {
+    fill: 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 12,
+    fontWeight: "700",
+    align: "center",
+  });
+  goalText.anchor.set(0.5, 0);
+  goalText.position.set(DESIGN_WIDTH / 2, HUD_TOP + 102);
+  goalText.zIndex = 21;
+  app.stage.addChild(goalText);
 
   const restart = new PIXI.Text("RESTART", {
     fill: 0xffffff,
@@ -1136,12 +1431,260 @@ function createHud() {
     restartGame().catch(showFatalError);
   });
   app.stage.addChild(restart);
+
+  const levels = new PIXI.Text("LEVELS", {
+    fill: 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 14,
+    fontWeight: "700",
+  });
+  levels.anchor.set(1, 0);
+  levels.position.set(DESIGN_WIDTH - 34, HUD_TOP + 39);
+  levels.eventMode = "static";
+  levels.cursor = "pointer";
+  levels.zIndex = 21;
+  levels.on("pointertap", showLevelSelect);
+  app.stage.addChild(levels);
 }
 
 function updateScoreText() {
   if (scoreText) {
     scoreText.text = String(score);
   }
+}
+
+function updateHudForLevel() {
+  if (levelText) {
+    levelText.text = currentLevel ? currentLevel.name : "关卡选择";
+  }
+  if (timeText) {
+    timeText.text = currentLevel ? formatTime(levelTimeLeftMs) : "";
+  }
+  updateGoalText();
+}
+
+function updateGoalText() {
+  if (!goalText) {
+    return;
+  }
+
+  if (!currentLevel) {
+    goalText.text = "";
+    return;
+  }
+
+  const goals = currentLevel.goals;
+  const parts = [];
+  if (goals.score) {
+    parts.push(`分数 ${score}/${goals.score}`);
+  }
+  if (goals.targetClears) {
+    parts.push(`${currentLevel.targetLabel || "目标"} ${levelStats.targetClears}/${goals.targetClears}`);
+  }
+  if (goals.combo) {
+    parts.push(`最高连消 ${levelStats.maxCombo}/${goals.combo}`);
+  }
+  if (goals.clears) {
+    parts.push(`消除 ${levelStats.clears}/${goals.clears}`);
+  }
+  goalText.text = parts.join("   ");
+}
+
+function createButton(label, x, y, width, height, onTap, options = {}) {
+  const container = new PIXI.Container();
+  const bg = new PIXI.Graphics();
+  bg.beginFill(options.fill || 0x111820, options.alpha ?? 0.86);
+  bg.lineStyle(2, options.line || 0xffffff, options.lineAlpha ?? 0.18);
+  bg.drawRoundedRect(0, 0, width, height, 8);
+  bg.endFill();
+  container.addChild(bg);
+
+  const text = new PIXI.Text(label, {
+    fill: options.textFill || 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: options.fontSize || 16,
+    fontWeight: "700",
+    align: "center",
+    wordWrap: true,
+    wordWrapWidth: width - 18,
+  });
+  text.anchor.set(0.5);
+  text.position.set(width / 2, height / 2);
+  container.addChild(text);
+
+  container.position.set(x, y);
+  container.eventMode = "static";
+  container.cursor = "pointer";
+  container.on("pointertap", onTap);
+  return container;
+}
+
+function hideLevelSelect() {
+  if (levelSelectContainer) {
+    levelSelectContainer.visible = false;
+  }
+}
+
+function showLevelSelect() {
+  gameStarted = false;
+  clearSelection();
+  hideResultOverlay();
+
+  if (levelSelectContainer) {
+    levelSelectContainer.destroy({ children: true });
+  }
+
+  levelSelectContainer = new PIXI.Container();
+  levelSelectContainer.zIndex = 80;
+
+  const shade = new PIXI.Graphics();
+  shade.beginFill(0x071018, 0.88);
+  shade.drawRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+  shade.endFill();
+  levelSelectContainer.addChild(shade);
+
+  const title = new PIXI.Text("关卡选择", {
+    fill: 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 34,
+    fontWeight: "800",
+  });
+  title.position.set(34, 92);
+  levelSelectContainer.addChild(title);
+
+  const hint = new PIXI.Text("通关后自动解锁下一关，进度会保存在本机。", {
+    fill: 0xbfeaf2,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 14,
+    fontWeight: "700",
+  });
+  hint.position.set(36, 138);
+  levelSelectContainer.addChild(hint);
+
+  LEVELS.forEach((level, index) => {
+    const y = 184 + index * 122;
+    const locked = level.id > unlockedLevel;
+    const card = new PIXI.Graphics();
+    card.beginFill(locked ? 0x17202a : level.background.top, locked ? 0.72 : 0.9);
+    card.lineStyle(2, locked ? 0xffffff : level.background.accent, locked ? 0.12 : 0.42);
+    card.drawRoundedRect(28, y, DESIGN_WIDTH - 56, 104, 8);
+    card.endFill();
+    levelSelectContainer.addChild(card);
+
+    const name = new PIXI.Text(`${level.name}  ${locked ? "未解锁" : level.subtitle}`, {
+      fill: locked ? 0x8d9aa8 : 0xffffff,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 18,
+      fontWeight: "800",
+    });
+    name.position.set(46, y + 17);
+    levelSelectContainer.addChild(name);
+
+    const desc = new PIXI.Text(`${level.duration}秒 | ${describeGoals(level)} | 障碍物 ${level.obstacles.length}个`, {
+      fill: locked ? 0x77838f : 0xe8fbff,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 13,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: 236,
+    });
+    desc.position.set(46, y + 48);
+    levelSelectContainer.addChild(desc);
+
+    const action = createButton(locked ? "LOCK" : "START", 314, y + 31, 70, 42, () => {
+      if (!locked) {
+        startLevel(level).catch(showFatalError);
+      }
+    }, {
+      fill: locked ? 0x27313d : 0x0c1218,
+      line: locked ? 0x596673 : level.background.accent,
+      textFill: locked ? 0x7d8792 : 0xffffff,
+      fontSize: 13,
+    });
+    levelSelectContainer.addChild(action);
+  });
+
+  app.stage.addChild(levelSelectContainer);
+  updateHudForLevel();
+}
+
+function hideResultOverlay() {
+  if (resultOverlay) {
+    resultOverlay.destroy({ children: true });
+    resultOverlay = null;
+  }
+}
+
+function showResultOverlay(passed) {
+  hideResultOverlay();
+  resultOverlay = new PIXI.Container();
+  resultOverlay.zIndex = 90;
+
+  const shade = new PIXI.Graphics();
+  shade.beginFill(0x061018, 0.82);
+  shade.drawRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+  shade.endFill();
+  resultOverlay.addChild(shade);
+
+  const panel = new PIXI.Graphics();
+  panel.beginFill(0x111923, 0.96);
+  panel.lineStyle(2, passed ? 0xffd66e : 0x7fb8ff, 0.55);
+  panel.drawRoundedRect(34, 244, DESIGN_WIDTH - 68, 318, 8);
+  panel.endFill();
+  resultOverlay.addChild(panel);
+
+  const title = new PIXI.Text(passed ? "通关成功" : "挑战失败", {
+    fill: passed ? 0xfff176 : 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 32,
+    fontWeight: "800",
+  });
+  title.anchor.set(0.5, 0);
+  title.position.set(DESIGN_WIDTH / 2, 278);
+  resultOverlay.addChild(title);
+
+  const detail = new PIXI.Text(`得分 ${score}   ${currentLevel ? describeGoals(currentLevel) : ""}\n${goalText?.text || ""}`, {
+    fill: 0xdff7ff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 15,
+    fontWeight: "700",
+    align: "center",
+    wordWrap: true,
+    wordWrapWidth: 300,
+  });
+  detail.anchor.set(0.5, 0);
+  detail.position.set(DESIGN_WIDTH / 2, 334);
+  resultOverlay.addChild(detail);
+
+  const retry = createButton("再来一次", 66, 444, 132, 52, () => {
+    restartGame().catch(showFatalError);
+  }, { fill: 0x27313d, line: 0x9fd6ff });
+  resultOverlay.addChild(retry);
+
+  const nextLabel = passed && currentLevel?.id < LEVELS.length ? "下一关" : "关卡";
+  const next = createButton(nextLabel, 232, 444, 132, 52, () => {
+    if (passed && currentLevel?.id < LEVELS.length) {
+      startLevel(LEVELS[currentLevel.id]).catch(showFatalError);
+      return;
+    }
+    showLevelSelect();
+  }, { fill: passed ? 0x2d5f58 : 0x27313d, line: passed ? 0x73f7cf : 0x9fd6ff });
+  resultOverlay.addChild(next);
+
+  app.stage.addChild(resultOverlay);
+}
+
+function finishLevel(passed) {
+  if (!gameStarted) {
+    return;
+  }
+
+  gameStarted = false;
+  clearSelection();
+  if (passed && currentLevel) {
+    saveProgress(currentLevel.id);
+  }
+  showResultOverlay(passed);
 }
 
 function startPhysics() {
@@ -1163,11 +1706,22 @@ function startTicker() {
     const now = performance.now();
     const delta = lastTimestamp === 0 ? 0 : now - lastTimestamp;
     lastTimestamp = now;
-    spawnTimer += delta;
 
-    while (spawnTimer >= SPAWN_INTERVAL_MS) {
-      spawnBall();
-      spawnTimer -= SPAWN_INTERVAL_MS;
+    if (gameStarted) {
+      levelTimeLeftMs -= delta;
+      if (timeText) {
+        timeText.text = formatTime(levelTimeLeftMs);
+      }
+
+      if (levelTimeLeftMs <= 0) {
+        finishLevel(isLevelComplete());
+      }
+
+      spawnTimer += delta;
+      while (spawnTimer >= SPAWN_INTERVAL_MS) {
+        spawnBall();
+        spawnTimer -= SPAWN_INTERVAL_MS;
+      }
     }
 
     updateParticles();
@@ -1184,6 +1738,7 @@ function showFatalError(error) {
 }
 
 async function main() {
+  loadProgress();
   await createPixiApp();
   setupAudio();
   setupWakeLock();
@@ -1195,7 +1750,7 @@ async function main() {
   setupInput();
   startPhysics();
   startTicker();
-  await restartGame();
+  showLevelSelect();
 
   if (loadingEl) {
     loadingEl.style.display = "none";

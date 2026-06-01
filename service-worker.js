@@ -1,11 +1,12 @@
-const CACHE_NAME = "laohu-tsumtsum-v12";
+const CACHE_NAME = "laohu-tsumtsum-v14";
 const FIRST_SPRITE_ID = 1;
 const TOTAL_SPRITES = 422;
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./game.js",
-  "./game.js?v=12",
+  "./game.js?v=13",
+  "./game.js?v=14",
   "./manifest.json",
   "./connect.wav",
   "./connect.wav?v=11",
@@ -37,9 +38,20 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (event.request.mode === "navigate" || event.request.destination === "document") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html"))),
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request);
-    }),
+    caches.match(event.request).then((cached) => cached || fetch(event.request)),
   );
 });
