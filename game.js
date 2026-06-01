@@ -3,22 +3,32 @@ const TOTAL_SPRITES = 422;
 const FIRST_SPRITE_ID = 1;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 8;
-const SPAWN_INTERVAL_MS = 760;
-const BALL_RADIUS = 52;
-const BODY_RADIUS = 40;
+const SPAWN_INTERVAL_MS = 680;
+const BALL_RADIUS = 46;
+const BODY_RADIUS = 34;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
 const SPAWN_X_RANGE = 178;
 const SPAWN_Y = 246;
-const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.32;
-const MAX_BALLS = 148;
+const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.08;
+const MAX_BALLS = 176;
 const WALL_THICKNESS = 34;
-const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
+const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 30;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
+const SPRINT_BEST_STORAGE_KEY = "laohu-tsumtsum-sprint-best-v1";
+const HERO_STORAGE_KEY = "laohu-tsumtsum-hero-v1";
+const HERO_MAX_ENERGY = 100;
+
+const HEROES = [
+  { id: "mickey", name: "米奇", assetId: 1, skillName: "星光竖线", skill: "vertical", description: "清除中线一列松松" },
+  { id: "dumbo", name: "小飞象", assetId: 2, skillName: "横扫飞行", skill: "horizontal", description: "清除中段横排松松" },
+  { id: "elsa", name: "艾莎", assetId: 3, skillName: "冰晶震波", skill: "shock", description: "全屏物理震动并清除少量松松" },
+  { id: "stitch", name: "史迪奇", assetId: 4, skillName: "蓝色同伴", skill: "convert", description: "把部分松松变成当前英雄" },
+];
 
 const LEVELS = [
   {
@@ -35,9 +45,9 @@ const LEVELS = [
   {
     id: 2,
     name: "第二关",
-    subtitle: "45秒五连消",
+    subtitle: "弹针救援",
     duration: 45,
-    goals: { combo: 5 },
+    goals: { score: 900, clears: 18 },
     targetWeight: 0.18,
     background: { top: 0x334a8f, bottom: 0x171c35, accent: 0xff8fb3, glow: 0x72f0ff },
     obstacles: [
@@ -49,9 +59,9 @@ const LEVELS = [
   {
     id: 3,
     name: "第三关",
-    subtitle: "连击和红色双目标",
+    subtitle: "红色收集线",
     duration: 70,
-    goals: { score: 1200, combo: 6, targetClears: 12 },
+    goals: { score: 1300, targetClears: 14 },
     targetLabel: "红色",
     targetWeight: 0.34,
     background: { top: 0x5e3f9d, bottom: 0x1f1631, accent: 0xf8bd5b, glow: 0x9af59a },
@@ -66,9 +76,9 @@ const LEVELS = [
   {
     id: 4,
     name: "第四关",
-    subtitle: "窄路高分挑战",
+    subtitle: "窄路清仓",
     duration: 55,
-    goals: { score: 1600, clears: 24 },
+    goals: { score: 1700, clears: 30 },
     targetWeight: 0.16,
     background: { top: 0x164f77, bottom: 0x111d24, accent: 0xfff176, glow: 0xff9f7a },
     obstacles: [
@@ -82,9 +92,9 @@ const LEVELS = [
   {
     id: 5,
     name: "第五关",
-    subtitle: "最终瓶中派对",
+    subtitle: "震波派对",
     duration: 75,
-    goals: { score: 2500, combo: 7, targetClears: 18 },
+    goals: { score: 2800, shockClears: 3, targetClears: 16 },
     targetLabel: "红色",
     targetWeight: 0.38,
     background: { top: 0x7a3047, bottom: 0x20121a, accent: 0x73f7cf, glow: 0xffd66e },
@@ -99,10 +109,11 @@ const LEVELS = [
   },
   {
     id: 6,
-    name: "无限关",
-    subtitle: "刷分到满仓",
-    duration: null,
+    name: "冲刺 1分钟",
+    subtitle: "最高分挑战",
+    duration: 60,
     infinite: true,
+    sprintMinutes: 1,
     goals: {},
     targetWeight: 0.18,
     background: { top: 0x217a64, bottom: 0x101a22, accent: 0xffd66e, glow: 0x7fffd4 },
@@ -112,6 +123,42 @@ const LEVELS = [
       { type: "bar", x: 215, y: 590, width: 82, height: 9, angle: 0.16 },
       { type: "pin", x: 150, y: 724, radius: 12 },
       { type: "pin", x: 280, y: 724, radius: 12 },
+    ],
+  },
+  {
+    id: 7,
+    name: "冲刺 3分钟",
+    subtitle: "最高分挑战",
+    duration: 180,
+    infinite: true,
+    sprintMinutes: 3,
+    goals: {},
+    targetWeight: 0.18,
+    background: { top: 0x2b6f9f, bottom: 0x11172a, accent: 0xffd166, glow: 0x9bf6ff },
+    obstacles: [
+      { type: "bar", x: 122, y: 412, width: 78, height: 9, angle: 0.3 },
+      { type: "bar", x: 308, y: 412, width: 78, height: 9, angle: -0.3 },
+      { type: "pin", x: 215, y: 560, radius: 12 },
+      { type: "pin", x: 130, y: 722, radius: 12 },
+      { type: "pin", x: 300, y: 722, radius: 12 },
+    ],
+  },
+  {
+    id: 8,
+    name: "冲刺 5分钟",
+    subtitle: "最高分挑战",
+    duration: 300,
+    infinite: true,
+    sprintMinutes: 5,
+    goals: {},
+    targetWeight: 0.18,
+    background: { top: 0x6c4a9b, bottom: 0x171126, accent: 0x84f2c2, glow: 0xff9fcb },
+    obstacles: [
+      { type: "pin", x: 104, y: 390, radius: 12 },
+      { type: "pin", x: 326, y: 390, radius: 12 },
+      { type: "bar", x: 154, y: 566, width: 78, height: 9, angle: -0.34 },
+      { type: "bar", x: 276, y: 566, width: 78, height: 9, angle: 0.34 },
+      { type: "pin", x: 215, y: 734, radius: 14 },
     ],
   },
 ];
@@ -190,10 +237,23 @@ let currentLevel = null;
 let currentLevelTargetSpriteId = null;
 let levelTimeLeftMs = 0;
 let levelEndReason = "";
+let sprintBestScores = {};
+let selectedHeroId = HEROES[0].id;
+let selectedHero = HEROES[0];
+let selectedHeroTexture = null;
+let heroContainer = null;
+let heroSprite = null;
+let heroEnergyBar = null;
+let heroEnergyText = null;
+let heroSkillButton = null;
+let heroSkillLabel = null;
+let heroSkillDesc = null;
+let heroEnergy = 0;
 let levelStats = {
   targetClears: 0,
   clears: 0,
   maxCombo: 0,
+  shockClears: 0,
 };
 
 const loadingEl = document.getElementById("loading");
@@ -226,11 +286,37 @@ function loadProgress() {
   if (Number.isFinite(saved) && saved >= 1) {
     unlockedLevel = Math.min(LEVELS.length, saved);
   }
+
+  try {
+    sprintBestScores = JSON.parse(window.localStorage.getItem(SPRINT_BEST_STORAGE_KEY) || "{}") || {};
+  } catch (_) {
+    sprintBestScores = {};
+  }
+
+  const savedHeroId = window.localStorage.getItem(HERO_STORAGE_KEY);
+  selectedHero = HEROES.find((hero) => hero.id === savedHeroId) || HEROES[0];
+  selectedHeroId = selectedHero.id;
 }
 
 function saveProgress(levelId) {
   unlockedLevel = Math.min(LEVELS.length, Math.max(unlockedLevel, levelId + 1));
   window.localStorage.setItem(PROGRESS_STORAGE_KEY, String(unlockedLevel));
+}
+
+function saveSprintBest(level, finalScore) {
+  if (!level?.infinite || !level.sprintMinutes) {
+    return false;
+  }
+
+  const key = String(level.sprintMinutes);
+  const previous = Number(sprintBestScores[key] || 0);
+  if (finalScore <= previous) {
+    return false;
+  }
+
+  sprintBestScores[key] = finalScore;
+  window.localStorage.setItem(SPRINT_BEST_STORAGE_KEY, JSON.stringify(sprintBestScores));
+  return true;
 }
 
 function formatTime(ms) {
@@ -242,7 +328,8 @@ function formatTime(ms) {
 
 function describeGoals(level) {
   if (level.infinite) {
-    return "无限刷分，满仓结束";
+    const best = sprintBestScores[String(level.sprintMinutes)] || 0;
+    return `${level.sprintMinutes}分钟冲刺 / 最高分 ${best}`;
   }
 
   const goals = [];
@@ -257,6 +344,9 @@ function describeGoals(level) {
   }
   if (level.goals.clears) {
     goals.push(`消除${level.goals.clears}个`);
+  }
+  if (level.goals.shockClears) {
+    goals.push(`触发震波x${level.goals.shockClears}`);
   }
   return goals.join(" / ");
 }
@@ -274,7 +364,8 @@ function isLevelComplete() {
   return (!goals.score || score >= goals.score)
     && (!goals.targetClears || levelStats.targetClears >= goals.targetClears)
     && (!goals.combo || levelStats.maxCombo >= goals.combo)
-    && (!goals.clears || levelStats.clears >= goals.clears);
+    && (!goals.clears || levelStats.clears >= goals.clears)
+    && (!goals.shockClears || levelStats.shockClears >= goals.shockClears);
 }
 
 async function createPixiApp() {
@@ -456,6 +547,28 @@ async function loadRoundTextures() {
   });
 }
 
+async function loadHeroTexture() {
+  const path = `assets/${selectedHero.assetId}.png`;
+  if (PIXI.Assets && PIXI.Assets.load) {
+    selectedHeroTexture = await PIXI.Assets.load(path);
+    return;
+  }
+
+  selectedHeroTexture = await new Promise((resolve, reject) => {
+    const loader = new PIXI.Loader();
+    loader.add(path, path);
+    loader.load((_, resources) => {
+      const texture = resources[path]?.texture;
+      if (!texture) {
+        reject(new Error("Hero asset failed to load."));
+        return;
+      }
+      resolve(texture);
+    });
+    loader.onError.add((error) => reject(error));
+  });
+}
+
 function makeCircularSprite(texture, isTarget = false) {
   const sprite = new PIXI.Sprite(texture);
   sprite.anchor.set(0.5);
@@ -490,13 +603,11 @@ function spawnBall() {
   }
 
   if (balls.length >= MAX_BALLS) {
-    finishFullLevel();
     return;
   }
 
   const spawnPoint = findOpenSpawnPoint();
   if (!spawnPoint) {
-    finishFullLevel();
     return;
   }
 
@@ -955,6 +1066,37 @@ function addSelectedBall(ball) {
   redrawConnectionLine();
 }
 
+function removeLastSelectedBall() {
+  const removed = selectedBalls.pop();
+  if (!removed) {
+    return;
+  }
+
+  removed.view.scale.set(1);
+  selectedBodyIds.delete(removed.body.id);
+  triggerHaptic(18);
+  redrawConnectionLine();
+}
+
+function addOrBacktrackSelectedBall(ball) {
+  if (!ball) {
+    return;
+  }
+
+  const last = selectedBalls[selectedBalls.length - 1];
+  const previous = selectedBalls[selectedBalls.length - 2];
+  if (last?.body.id === ball.body.id) {
+    return;
+  }
+
+  if (previous?.body.id === ball.body.id) {
+    removeLastSelectedBall();
+    return;
+  }
+
+  addSelectedBall(ball);
+}
+
 function triggerBallShake(ball, strength) {
   if (!ball?.body) {
     return;
@@ -965,6 +1107,42 @@ function triggerBallShake(ball, strength) {
     y: ball.body.velocity.y - strength * 0.12,
   });
   Body.setAngularVelocity(ball.body, ball.body.angularVelocity + (Math.random() - 0.5) * 0.18);
+}
+
+function triggerPhysicsQuake(origin, chainLength) {
+  const strength = Math.min(0.15, 0.075 + chainLength * 0.01);
+  const lift = Math.min(8.5, 4.8 + chainLength * 0.45);
+
+  for (const ball of balls) {
+    const body = ball.body;
+    const dx = body.position.x - origin.x;
+    const dy = body.position.y - origin.y;
+    const distance = Math.max(52, Math.hypot(dx, dy));
+    const radial = Math.min(1.25, 260 / distance);
+    const sidePulse = (Math.random() - 0.5) * strength * 0.65;
+    Body.applyForce(body, body.position, {
+      x: ((dx / distance) * strength * radial + sidePulse) * body.mass,
+      y: ((dy / distance) * strength * radial - strength * 1.15) * body.mass,
+    });
+    Body.setVelocity(body, {
+      x: body.velocity.x + (dx / distance) * lift * radial + (Math.random() - 0.5) * lift,
+      y: body.velocity.y - lift * (0.8 + Math.random() * 0.55),
+    });
+    Body.setAngularVelocity(body, body.angularVelocity + (Math.random() - 0.5) * 0.9);
+  }
+
+  triggerVisualShake(24 + chainLength * 2, 14 + chainLength * 1.8);
+}
+
+function getChainCenter(chain) {
+  if (chain.length === 0) {
+    return { x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT / 2 };
+  }
+
+  return chain.reduce((center, ball) => ({
+    x: center.x + ball.body.position.x / chain.length,
+    y: center.y + ball.body.position.y / chain.length,
+  }), { x: 0, y: 0 });
 }
 
 function redrawConnectionLine() {
@@ -1050,7 +1228,7 @@ function handlePointerDown(event) {
   }
 
   for (const ball of touchedBalls) {
-    addSelectedBall(ball);
+    addOrBacktrackSelectedBall(ball);
   }
   redrawConnectionLine();
 }
@@ -1063,7 +1241,7 @@ function handlePointerMove(event) {
   const point = getPointerPosition(event);
   dragPointerPosition = point;
   for (const ball of findTouchedBalls(lastPointerPosition, point)) {
-    addSelectedBall(ball);
+    addOrBacktrackSelectedBall(ball);
   }
   lastPointerPosition = point;
   redrawConnectionLine();
@@ -1188,24 +1366,51 @@ function burstParticles(x, y) {
   }
 }
 
+function addHeroEnergy(amount) {
+  heroEnergy = Math.min(HERO_MAX_ENERGY, heroEnergy + amount);
+  updateHeroUi();
+}
+
+function removeBall(ball, withParticles = true) {
+  if (withParticles) {
+    burstParticles(ball.body.position.x, ball.body.position.y);
+  }
+  Composite.remove(engine.world, ball.body);
+  ball.view.destroy({ children: true });
+}
+
+function removeBalls(removingBalls, scoreMultiplier = 100) {
+  const removing = new Set(removingBalls.map((ball) => ball.body.id));
+  const targetClears = removingBalls.filter((ball) => ball.spriteId === currentLevelTargetSpriteId).length;
+  for (const ball of removingBalls) {
+    removeBall(ball);
+  }
+  balls = balls.filter((ball) => !removing.has(ball.body.id));
+  score += removing.size * scoreMultiplier;
+  levelStats.clears += removing.size;
+  levelStats.targetClears += targetClears;
+  updateScoreText();
+  updateGoalText();
+  return removing.size;
+}
+
 function explodeSelectedBalls() {
-  const removing = new Set(selectedBalls.map((ball) => ball.body.id));
+  const chain = [...selectedBalls];
   const chainLength = selectedBalls.length;
-  const targetClears = selectedBalls.filter((ball) => ball.spriteId === currentLevelTargetSpriteId).length;
+  const quakeCenter = getChainCenter(chain);
   triggerHaptic([90, 50, 130]);
 
-  for (const ball of selectedBalls) {
+  for (const ball of chain) {
     triggerBallShake(ball, 14);
-    burstParticles(ball.body.position.x, ball.body.position.y);
-    Composite.remove(engine.world, ball.body);
-    ball.view.destroy({ children: true });
   }
 
-  balls = balls.filter((ball) => !removing.has(ball.body.id));
-  score += removing.size * 100;
-  levelStats.clears += chainLength;
-  levelStats.targetClears += targetClears;
+  removeBalls(chain);
   levelStats.maxCombo = Math.max(levelStats.maxCombo, chainLength);
+  addHeroEnergy(10 + chainLength * 9);
+  if (chainLength >= 5) {
+    levelStats.shockClears += 1;
+    triggerPhysicsQuake(quakeCenter, chainLength);
+  }
   updateScoreText();
   updateGoalText();
   selectedBalls = [];
@@ -1215,6 +1420,43 @@ function explodeSelectedBalls() {
   lineCore.clear();
   lineNodes.clear();
 
+  if (isLevelComplete()) {
+    finishLevel(true);
+  }
+}
+
+function useHeroSkill() {
+  if (!gameStarted || heroEnergy < HERO_MAX_ENERGY) {
+    return;
+  }
+
+  heroEnergy = 0;
+  triggerHaptic([60, 35, 100]);
+  playPopSound();
+
+  if (selectedHero.skill === "vertical") {
+    const targets = balls.filter((ball) => Math.abs(ball.body.position.x - DESIGN_WIDTH / 2) < 76);
+    removeBalls(targets.slice(0, 18), 120);
+  } else if (selectedHero.skill === "horizontal") {
+    const targets = balls.filter((ball) => Math.abs(ball.body.position.y - 590) < 76);
+    removeBalls(targets.slice(0, 18), 120);
+  } else if (selectedHero.skill === "shock") {
+    triggerPhysicsQuake({ x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.58 }, 9);
+    removeBalls(shuffle(balls).slice(0, 8), 130);
+  } else if (selectedHero.skill === "convert") {
+    const targets = shuffle(balls).slice(0, Math.min(14, balls.length));
+    for (const ball of targets) {
+      ball.spriteId = selectedHero.assetId;
+      ball.view.destroy({ children: true });
+      ball.view = makeCircularSprite(selectedHeroTexture, selectedHero.assetId === currentLevelTargetSpriteId);
+      ball.view.zIndex = 3;
+      app.stage.addChild(ball.view);
+      ball.view.position.set(ball.body.position.x, ball.body.position.y);
+    }
+    triggerPhysicsQuake({ x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.62 }, 5);
+  }
+
+  updateHeroUi();
   if (isLevelComplete()) {
     finishLevel(true);
   }
@@ -1426,7 +1668,8 @@ async function startLevel(level) {
   currentLevelTargetSpriteId = null;
   levelTimeLeftMs = Number.isFinite(level.duration) ? level.duration * 1000 : Infinity;
   levelEndReason = "";
-  levelStats = { targetClears: 0, clears: 0, maxCombo: 0 };
+  levelStats = { targetClears: 0, clears: 0, maxCombo: 0, shockClears: 0 };
+  heroEnergy = 0;
   spawnTimer = 0;
   clearBalls();
   clearParticles();
@@ -1436,11 +1679,12 @@ async function startLevel(level) {
   updateGoalText();
   drawBackground();
   createLevelObstacles();
-  await loadRoundTextures();
+  await Promise.all([loadRoundTextures(), loadHeroTexture()]);
   currentLevelTargetSpriteId = level.goals.targetClears ? selectedSpriteIds[0] : null;
   hideLevelSelect();
   hideResultOverlay();
   updateHudForLevel();
+  updateHeroUi();
   gameStarted = true;
 }
 
@@ -1542,6 +1786,105 @@ function createHud() {
   levels.zIndex = 21;
   levels.on("pointertap", showLevelSelect);
   app.stage.addChild(levels);
+
+  createHeroUi();
+}
+
+function createHeroUi() {
+  heroContainer = new PIXI.Container();
+  heroContainer.zIndex = 22;
+
+  const pad = new PIXI.Graphics();
+  pad.beginFill(0x071018, 0.48);
+  pad.lineStyle(2, 0xffffff, 0.16);
+  pad.drawRoundedRect(24, DESIGN_HEIGHT - 132, DESIGN_WIDTH - 48, 108, 8);
+  pad.endFill();
+  heroContainer.addChild(pad);
+
+  heroSprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+  heroSprite.anchor.set(0.5, 1);
+  heroSprite.width = 118;
+  heroSprite.height = 118;
+  heroSprite.position.set(82, DESIGN_HEIGHT - 26);
+  heroContainer.addChild(heroSprite);
+
+  heroSkillLabel = new PIXI.Text("", {
+    fill: 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 16,
+    fontWeight: "800",
+  });
+  heroSkillLabel.position.set(150, DESIGN_HEIGHT - 118);
+  heroContainer.addChild(heroSkillLabel);
+
+  heroSkillDesc = new PIXI.Text("", {
+    fill: 0xcdf7ff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 12,
+    fontWeight: "700",
+    wordWrap: true,
+    wordWrapWidth: 138,
+  });
+  heroSkillDesc.position.set(150, DESIGN_HEIGHT - 94);
+  heroContainer.addChild(heroSkillDesc);
+
+  const energyTrack = new PIXI.Graphics();
+  energyTrack.beginFill(0x111820, 0.88);
+  energyTrack.drawRoundedRect(150, DESIGN_HEIGHT - 58, 130, 14, 7);
+  energyTrack.endFill();
+  heroContainer.addChild(energyTrack);
+
+  heroEnergyBar = new PIXI.Graphics();
+  heroContainer.addChild(heroEnergyBar);
+
+  heroEnergyText = new PIXI.Text("", {
+    fill: 0xfff176,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 12,
+    fontWeight: "800",
+  });
+  heroEnergyText.position.set(150, DESIGN_HEIGHT - 40);
+  heroContainer.addChild(heroEnergyText);
+
+  heroSkillButton = createButton("技能", 300, DESIGN_HEIGHT - 86, 82, 44, useHeroSkill, {
+    fill: 0x2d5f58,
+    line: 0x73f7cf,
+    fontSize: 15,
+  });
+  heroContainer.addChild(heroSkillButton);
+  app.stage.addChild(heroContainer);
+  updateHeroUi();
+}
+
+function updateHeroUi() {
+  if (!heroContainer) {
+    return;
+  }
+
+  if (heroSprite && selectedHeroTexture) {
+    heroSprite.texture = selectedHeroTexture;
+  }
+
+  if (heroSkillLabel) {
+    heroSkillLabel.text = `${selectedHero.name} · ${selectedHero.skillName}`;
+  }
+  if (heroSkillDesc) {
+    heroSkillDesc.text = selectedHero.description;
+  }
+
+  const ratio = Math.max(0, Math.min(1, heroEnergy / HERO_MAX_ENERGY));
+  if (heroEnergyBar) {
+    heroEnergyBar.clear();
+    heroEnergyBar.beginFill(ratio >= 1 ? 0xfff176 : 0x73f7cf, 0.95);
+    heroEnergyBar.drawRoundedRect(150, DESIGN_HEIGHT - 58, 130 * ratio, 14, 7);
+    heroEnergyBar.endFill();
+  }
+  if (heroEnergyText) {
+    heroEnergyText.text = ratio >= 1 ? "能量已满" : `能量 ${Math.floor(heroEnergy)}/${HERO_MAX_ENERGY}`;
+  }
+  if (heroSkillButton) {
+    heroSkillButton.alpha = ratio >= 1 ? 1 : 0.48;
+  }
 }
 
 function updateScoreText() {
@@ -1584,9 +1927,13 @@ function updateGoalText() {
   if (goals.clears) {
     parts.push(`消除 ${levelStats.clears}/${goals.clears}`);
   }
+  if (goals.shockClears) {
+    parts.push(`震波 ${levelStats.shockClears}/${goals.shockClears}`);
+  }
   if (currentLevel.infinite) {
+    const best = sprintBestScores[String(currentLevel.sprintMinutes)] || 0;
     parts.push(`分数 ${score}`);
-    parts.push(`仓位 ${balls.length}/${MAX_BALLS}`);
+    parts.push(`最高 ${best}`);
   }
   goalText.text = parts.join("   ");
 }
@@ -1653,7 +2000,7 @@ function showLevelSelect() {
   title.position.set(34, 92);
   levelSelectContainer.addChild(title);
 
-  const hint = new PIXI.Text("通关后自动解锁下一关，进度会保存在本机。", {
+  const hint = new PIXI.Text("通关后解锁下一关；冲刺关可直接挑战并保存 1/3/5 分钟最高分。", {
     fill: 0xbfeaf2,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
     fontSize: 14,
@@ -1663,37 +2010,37 @@ function showLevelSelect() {
   levelSelectContainer.addChild(hint);
 
   LEVELS.forEach((level, index) => {
-    const y = 184 + index * 122;
+    const y = 162 + index * 72;
     const locked = !level.infinite && level.id > unlockedLevel;
     const card = new PIXI.Graphics();
     card.beginFill(locked ? 0x17202a : level.background.top, locked ? 0.72 : 0.9);
     card.lineStyle(2, locked ? 0xffffff : level.background.accent, locked ? 0.12 : 0.42);
-    card.drawRoundedRect(28, y, DESIGN_WIDTH - 56, 104, 8);
+    card.drawRoundedRect(28, y, DESIGN_WIDTH - 56, 62, 8);
     card.endFill();
     levelSelectContainer.addChild(card);
 
     const name = new PIXI.Text(`${level.name}  ${locked ? "未解锁" : level.subtitle}`, {
       fill: locked ? 0x8d9aa8 : 0xffffff,
       fontFamily: "Arial, Microsoft YaHei, sans-serif",
-      fontSize: 18,
+      fontSize: 15,
       fontWeight: "800",
     });
-    name.position.set(46, y + 17);
+    name.position.set(46, y + 10);
     levelSelectContainer.addChild(name);
 
     const timeLabel = Number.isFinite(level.duration) ? `${level.duration}秒` : "不限时";
-    const desc = new PIXI.Text(`${timeLabel} | ${describeGoals(level)} | 障碍物 ${level.obstacles.length}个`, {
+    const desc = new PIXI.Text(`${timeLabel} | ${describeGoals(level)} | 障碍 ${level.obstacles.length}`, {
       fill: locked ? 0x77838f : 0xe8fbff,
       fontFamily: "Arial, Microsoft YaHei, sans-serif",
-      fontSize: 13,
+      fontSize: 11,
       fontWeight: "700",
       wordWrap: true,
-      wordWrapWidth: 236,
+      wordWrapWidth: 238,
     });
-    desc.position.set(46, y + 48);
+    desc.position.set(46, y + 34);
     levelSelectContainer.addChild(desc);
 
-    const action = createButton(locked ? "LOCK" : "START", 314, y + 31, 70, 42, () => {
+    const action = createButton(locked ? "LOCK" : "START", 314, y + 12, 70, 38, () => {
       if (!locked) {
         startLevel(level).catch(showFatalError);
       }
@@ -1705,6 +2052,45 @@ function showLevelSelect() {
     });
     levelSelectContainer.addChild(action);
   });
+
+  const heroTitle = new PIXI.Text("选择松松英雄", {
+    fill: 0xfff176,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 14,
+    fontWeight: "800",
+  });
+  heroTitle.position.set(34, 748);
+  levelSelectContainer.addChild(heroTitle);
+
+  HEROES.forEach((hero, index) => {
+    const selected = hero.id === selectedHeroId;
+    const button = createButton(hero.name, 34 + index * 94, 774, 82, 40, () => {
+      selectedHero = hero;
+      selectedHeroId = hero.id;
+      window.localStorage.setItem(HERO_STORAGE_KEY, hero.id);
+      loadHeroTexture().then(() => {
+        updateHeroUi();
+        showLevelSelect();
+      }).catch(showFatalError);
+    }, {
+      fill: selected ? 0x2d5f58 : 0x17202a,
+      line: selected ? 0x73f7cf : 0xffffff,
+      lineAlpha: selected ? 0.85 : 0.18,
+      fontSize: 13,
+    });
+    levelSelectContainer.addChild(button);
+  });
+
+  const heroDesc = new PIXI.Text(`${selectedHero.skillName}：${selectedHero.description}`, {
+    fill: 0xcdf7ff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 12,
+    fontWeight: "700",
+    wordWrap: true,
+    wordWrapWidth: DESIGN_WIDTH - 68,
+  });
+  heroDesc.position.set(34, 824);
+  levelSelectContainer.addChild(heroDesc);
 
   app.stage.addChild(levelSelectContainer);
   updateHudForLevel();
@@ -1721,8 +2107,8 @@ function showResultOverlay(passed) {
   hideResultOverlay();
   resultOverlay = new PIXI.Container();
   resultOverlay.zIndex = 90;
-  const isFullEnd = levelEndReason === "full";
-  const titleText = isFullEnd ? "容器已满" : (passed ? "通关成功" : "挑战失败");
+  const isSprint = currentLevel?.infinite;
+  const titleText = isSprint ? "冲刺结束" : (passed ? "通关成功" : "挑战失败");
 
   const shade = new PIXI.Graphics();
   shade.beginFill(0x061018, 0.82);
@@ -1747,8 +2133,9 @@ function showResultOverlay(passed) {
   title.position.set(DESIGN_WIDTH / 2, 278);
   resultOverlay.addChild(title);
 
-  const detailText = isFullEnd
-    ? `最终得分 ${score}   已装满 ${balls.length}/${MAX_BALLS}\n分数 ${score}   仓位 ${balls.length}/${MAX_BALLS}`
+  const sprintBest = currentLevel?.sprintMinutes ? (sprintBestScores[String(currentLevel.sprintMinutes)] || 0) : 0;
+  const detailText = isSprint
+    ? `得分 ${score}   ${currentLevel.sprintMinutes}分钟最高 ${sprintBest}\n${levelEndReason === "newBest" ? "新纪录" : "继续冲刺可刷新纪录"}`
     : `得分 ${score}   ${currentLevel ? describeGoals(currentLevel) : ""}\n${goalText?.text || ""}`;
   const detail = new PIXI.Text(detailText, {
     fill: 0xdff7ff,
@@ -1768,9 +2155,9 @@ function showResultOverlay(passed) {
   }, { fill: 0x27313d, line: 0x9fd6ff });
   resultOverlay.addChild(retry);
 
-  const nextLabel = passed && currentLevel?.id < LEVELS.length ? "下一关" : "关卡";
+  const nextLabel = passed && currentLevel?.id < 5 ? "下一关" : "关卡";
   const next = createButton(nextLabel, 232, 444, 132, 52, () => {
-    if (passed && currentLevel?.id < LEVELS.length) {
+    if (passed && currentLevel?.id < 5) {
       startLevel(LEVELS[currentLevel.id]).catch(showFatalError);
       return;
     }
@@ -1791,20 +2178,12 @@ function finishLevel(passed) {
   if (passed && currentLevel && !currentLevel.infinite) {
     saveProgress(currentLevel.id);
   }
+  if (currentLevel?.infinite) {
+    levelEndReason = saveSprintBest(currentLevel, score) ? "newBest" : "sprint";
+    passed = true;
+    updateGoalText();
+  }
   showResultOverlay(passed);
-}
-
-function finishFullLevel() {
-  if (!gameStarted) {
-    return;
-  }
-
-  levelEndReason = "full";
-  updateGoalText();
-  if (currentLevel?.infinite && goalText) {
-    goalText.text = `分数 ${score}   仓位 ${balls.length}/${MAX_BALLS}`;
-  }
-  finishLevel(false);
 }
 
 function startPhysics() {
