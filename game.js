@@ -4,7 +4,7 @@ const FIRST_SPRITE_ID = 76;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 5;
 const SPAWN_INTERVAL_MS = 880;
-const BALL_RADIUS = 35;
+const BALL_RADIUS = 40;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
@@ -13,7 +13,7 @@ const MAX_BALLS = 120;
 const WALL_THICKNESS = 42;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
 const HUD_TOP = 54;
-const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 46;
+const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 50;
 
 const BOTTLE = {
   leftNeckTop: { x: 132, y: 96 },
@@ -52,6 +52,7 @@ let lineCore;
 let particleLayer;
 let scoreText;
 let popSound;
+let selectSound;
 let selectedBalls = [];
 let selectedBodyIds = new Set();
 let particles = [];
@@ -66,7 +67,10 @@ let audioUnlocked = false;
 let wakeLock = null;
 let audioContext = null;
 let popBuffer = null;
+let selectBuffer = null;
 let keepAwakeVideo = null;
+let feedbackShakeFrames = 0;
+let feedbackShakeStrength = 0;
 
 const loadingEl = document.getElementById("loading");
 const gameRoot = document.getElementById("game-root");
@@ -345,6 +349,14 @@ function triggerHaptic(pattern = 18) {
   if (haptics?.impact) {
     haptics.impact({ style: "medium" }).catch(() => {});
   }
+
+  const duration = Array.isArray(pattern) ? Math.max(...pattern) : pattern;
+  triggerVisualShake(duration >= 40 ? 9 : 5, duration >= 40 ? 4.5 : 2.6);
+}
+
+function triggerVisualShake(frames, strength) {
+  feedbackShakeFrames = Math.max(feedbackShakeFrames, frames);
+  feedbackShakeStrength = Math.max(feedbackShakeStrength, strength);
 }
 
 async function requestWakeLock() {
@@ -388,15 +400,25 @@ async function ensureAudioContext() {
   return audioContext;
 }
 
-async function loadPopBuffer() {
+async function loadAudioBuffer(path) {
   const context = await ensureAudioContext();
-  if (!context || popBuffer) {
-    return;
+  if (!context) {
+    return null;
   }
 
-  const response = await fetch("pop_bomb.wav", { cache: "force-cache" });
+  const response = await fetch(path, { cache: "force-cache" });
   const arrayBuffer = await response.arrayBuffer();
-  popBuffer = await context.decodeAudioData(arrayBuffer);
+  return context.decodeAudioData(arrayBuffer);
+}
+
+async function loadSoundBuffers() {
+  if (!selectBuffer) {
+    selectBuffer = await loadAudioBuffer("pop.wav");
+  }
+
+  if (!popBuffer) {
+    popBuffer = await loadAudioBuffer("pop_bomb.wav");
+  }
 }
 
 function playKeepAwakeVideo() {
@@ -439,29 +461,37 @@ async function unlockAudio() {
   }
 
   try {
-    await loadPopBuffer();
+    await loadSoundBuffers();
+    playSyntheticPop(0.001, 180, 0.02);
     audioUnlocked = true;
     return;
   } catch (_) {
     audioUnlocked = false;
   }
 
-  if (popSound) {
-    const previousVolume = popSound.volume;
-    popSound.volume = 0;
-    popSound.currentTime = 0;
-    popSound
-      .play()
-      .then(() => {
-        popSound.pause();
-        popSound.currentTime = 0;
-        popSound.volume = previousVolume;
-        audioUnlocked = true;
-      })
-      .catch(() => {
-        popSound.volume = previousVolume;
-      });
+  unlockHtmlAudio(selectSound);
+  unlockHtmlAudio(popSound);
+}
+
+function unlockHtmlAudio(sound) {
+  if (!sound) {
+    return;
   }
+
+  const previousVolume = sound.volume;
+  sound.volume = 0;
+  sound.currentTime = 0;
+  sound
+    .play()
+    .then(() => {
+      sound.pause();
+      sound.currentTime = 0;
+      sound.volume = previousVolume;
+      audioUnlocked = true;
+    })
+    .catch(() => {
+      sound.volume = previousVolume;
+    });
 }
 
 function activateMobileSession() {
@@ -577,8 +607,9 @@ function addSelectedBall(ball) {
 
   selectedBalls.push(ball);
   selectedBodyIds.add(ball.body.id);
-  ball.view.scale.set(1.14);
-  triggerHaptic(selectedBalls.length === 1 ? 16 : 26);
+  ball.view.scale.set(1.18);
+  triggerHaptic(selectedBalls.length === 1 ? 24 : 38);
+  playSelectSound();
   redrawConnectionLine();
 }
 
@@ -694,24 +725,73 @@ function handlePointerUp() {
   }
 }
 
-function playPopSound() {
-  if (audioContext && popBuffer) {
+function playSoundBuffer(buffer, volume = 0.85) {
+  if (audioContext && buffer) {
     const source = audioContext.createBufferSource();
     const gain = audioContext.createGain();
-    source.buffer = popBuffer;
-    gain.gain.value = 0.85;
+    source.buffer = buffer;
+    gain.gain.value = volume;
     source.connect(gain);
     gain.connect(audioContext.destination);
     source.start(audioContext.currentTime);
+    return true;
+  }
+
+  return false;
+}
+
+function playHtmlSound(sound) {
+  if (!sound) {
+    return false;
+  }
+
+  sound.currentTime = 0;
+  sound.play().catch(() => {});
+  return true;
+}
+
+function playSyntheticPop(volume = 0.18, frequency = 420, duration = 0.055) {
+  if (!audioContext) {
+    return false;
+  }
+
+  const now = audioContext.currentTime;
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  oscillator.type = "triangle";
+  oscillator.frequency.setValueAtTime(frequency, now);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(80, frequency * 0.35), now + duration);
+  gain.gain.setValueAtTime(volume, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  oscillator.start(now);
+  oscillator.stop(now + duration);
+  return true;
+}
+
+function playSelectSound() {
+  if (playSoundBuffer(selectBuffer, 0.36)) {
     return;
   }
 
-  if (!popSound) {
+  if (playHtmlSound(selectSound)) {
     return;
   }
 
-  popSound.currentTime = 0;
-  popSound.play().catch(() => {});
+  playSyntheticPop(0.11, 520, 0.035);
+}
+
+function playPopSound() {
+  if (playSoundBuffer(popBuffer, 0.95)) {
+    return;
+  }
+
+  if (playHtmlSound(popSound)) {
+    return;
+  }
+
+  playSyntheticPop(0.22, 360, 0.075);
 }
 
 function makeStarParticle(x, y) {
@@ -755,7 +835,7 @@ function burstParticles(x, y) {
 
 function explodeSelectedBalls() {
   const removing = new Set(selectedBalls.map((ball) => ball.body.id));
-  triggerHaptic([28, 24, 52]);
+  triggerHaptic([60, 36, 90]);
 
   for (const ball of selectedBalls) {
     burstParticles(ball.body.position.x, ball.body.position.y);
@@ -823,11 +903,16 @@ function setupInput() {
 }
 
 function setupAudio() {
+  selectSound = new Audio("pop.wav");
+  selectSound.preload = "auto";
+  selectSound.volume = 0.38;
+  selectSound.load();
+
   popSound = new Audio("pop_bomb.wav");
   popSound.preload = "auto";
-  popSound.volume = 0.72;
+  popSound.volume = 0.9;
   popSound.load();
-  loadPopBuffer().catch(() => {});
+  loadSoundBuffers().catch(() => {});
 }
 
 function syncSprites() {
@@ -842,6 +927,25 @@ function syncSprites() {
   if (isDragging) {
     redrawConnectionLine();
   }
+}
+
+function updateFeedbackShake() {
+  if (!app?.stage) {
+    return;
+  }
+
+  if (feedbackShakeFrames <= 0) {
+    app.stage.position.set(0, 0);
+    feedbackShakeStrength = 0;
+    return;
+  }
+
+  const strength = feedbackShakeStrength * (feedbackShakeFrames / 9);
+  app.stage.position.set(
+    (Math.random() - 0.5) * strength,
+    (Math.random() - 0.5) * strength,
+  );
+  feedbackShakeFrames -= 1;
 }
 
 function clearBalls() {
@@ -943,6 +1047,7 @@ function startTicker() {
     }
 
     updateParticles();
+    updateFeedbackShake();
   });
 }
 
