@@ -1,4 +1,4 @@
-const CACHE_NAME = "laohu-tsumtsum-v2";
+const CACHE_NAME = "laohu-tsumtsum-v3";
 const FIRST_SPRITE_ID = 76;
 const TOTAL_SPRITES = 126;
 const CORE_ASSETS = [

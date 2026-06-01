@@ -4,28 +4,29 @@ const FIRST_SPRITE_ID = 76;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 5;
 const SPAWN_INTERVAL_MS = 520;
-const BALL_RADIUS = 25;
+const BALL_RADIUS = 31;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
-const SPAWN_X_RANGE = 60;
+const SPAWN_X_RANGE = 132;
 const MAX_BALLS = 120;
 const WALL_THICKNESS = 42;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
+const HUD_TOP = 54;
 
 const BOTTLE = {
-  leftNeckTop: { x: 156, y: 118 },
-  rightNeckTop: { x: 274, y: 118 },
-  leftMouth: { x: 126, y: 228 },
-  rightMouth: { x: 304, y: 228 },
-  leftShoulder: { x: 92, y: 336 },
-  rightShoulder: { x: 338, y: 336 },
-  leftLowerSide: { x: 72, y: 759 },
-  rightLowerSide: { x: 358, y: 759 },
-  leftHeel: { x: 96, y: 818 },
-  rightHeel: { x: 334, y: 818 },
-  leftFloor: { x: 156, y: 835 },
-  rightFloor: { x: 274, y: 835 },
+  leftNeckTop: { x: 132, y: 96 },
+  rightNeckTop: { x: 298, y: 96 },
+  leftMouth: { x: 82, y: 210 },
+  rightMouth: { x: 348, y: 210 },
+  leftShoulder: { x: 34, y: 318 },
+  rightShoulder: { x: 396, y: 318 },
+  leftLowerSide: { x: 18, y: 826 },
+  rightLowerSide: { x: 412, y: 826 },
+  leftHeel: { x: 42, y: 895 },
+  rightHeel: { x: 388, y: 895 },
+  leftFloor: { x: 94, y: 920 },
+  rightFloor: { x: 336, y: 920 },
 };
 
 const {
@@ -58,7 +59,10 @@ let lastTimestamp = 0;
 let gameStarted = false;
 let isDragging = false;
 let lastPointerPosition = null;
+let dragPointerPosition = null;
 let score = 0;
+let audioUnlocked = false;
+let wakeLock = null;
 
 const loadingEl = document.getElementById("loading");
 const gameRoot = document.getElementById("game-root");
@@ -156,13 +160,13 @@ function drawBottle() {
   bottle.beginFill(0xc7efff, 0.12);
   bottle.moveTo(BOTTLE.leftNeckTop.x, BOTTLE.leftNeckTop.y);
   bottle.lineTo(BOTTLE.leftMouth.x, BOTTLE.leftMouth.y);
-  bottle.quadraticCurveTo(112, 282, BOTTLE.leftShoulder.x, BOTTLE.leftShoulder.y);
+  bottle.quadraticCurveTo(100, 270, BOTTLE.leftShoulder.x, BOTTLE.leftShoulder.y);
   bottle.lineTo(BOTTLE.leftLowerSide.x, BOTTLE.leftLowerSide.y);
   bottle.quadraticCurveTo(BOTTLE.leftHeel.x, BOTTLE.leftHeel.y, BOTTLE.leftFloor.x, BOTTLE.leftFloor.y);
   bottle.lineTo(BOTTLE.rightFloor.x, BOTTLE.rightFloor.y);
   bottle.quadraticCurveTo(BOTTLE.rightHeel.x, BOTTLE.rightHeel.y, BOTTLE.rightLowerSide.x, BOTTLE.rightLowerSide.y);
   bottle.lineTo(BOTTLE.rightShoulder.x, BOTTLE.rightShoulder.y);
-  bottle.quadraticCurveTo(318, 282, BOTTLE.rightMouth.x, BOTTLE.rightMouth.y);
+  bottle.quadraticCurveTo(330, 270, BOTTLE.rightMouth.x, BOTTLE.rightMouth.y);
   bottle.lineTo(BOTTLE.rightNeckTop.x, BOTTLE.rightNeckTop.y);
   bottle.moveTo(BOTTLE.leftNeckTop.x, BOTTLE.leftNeckTop.y);
   bottle.lineTo(BOTTLE.rightNeckTop.x, BOTTLE.rightNeckTop.y);
@@ -173,10 +177,10 @@ function drawBottle() {
   bottle.lineTo(BOTTLE.leftMouth.x + 10, BOTTLE.leftMouth.y - 14);
   bottle.moveTo(BOTTLE.rightNeckTop.x - 10, BOTTLE.rightNeckTop.y + 12);
   bottle.lineTo(BOTTLE.rightMouth.x - 10, BOTTLE.rightMouth.y - 14);
-  bottle.moveTo(156, 306);
-  bottle.quadraticCurveTo(124, 462, 144, 731);
-  bottle.moveTo(292, 360);
-  bottle.quadraticCurveTo(322, 550, 288, 707);
+  bottle.moveTo(114, 292);
+  bottle.quadraticCurveTo(62, 500, 82, 838);
+  bottle.moveTo(316, 344);
+  bottle.quadraticCurveTo(380, 570, 348, 852);
 
   bottle.zIndex = 2;
   app.stage.addChild(bottle);
@@ -275,7 +279,7 @@ function spawnBall() {
   }
 
   const x = SPAWN_X_CENTER + (Math.random() - 0.5) * SPAWN_X_RANGE;
-  const y = 170 + Math.random() * 8;
+  const y = 134 + Math.random() * 8;
   const textureEntry = textures[Math.floor(Math.random() * textures.length)];
   const body = Bodies.circle(x, y, BALL_RADIUS, {
     restitution: 0.2,
@@ -299,7 +303,7 @@ function isOutsideBottleSafetyZone(body) {
     return true;
   }
 
-  if (x < 46 || x > 384 || y > 872) {
+  if (x < 4 || x > DESIGN_WIDTH - 4 || y > DESIGN_HEIGHT + BALL_RADIUS) {
     return true;
   }
 
@@ -313,7 +317,7 @@ function isOutsideBottleSafetyZone(body) {
 function returnEscapedBall(body) {
   Body.setPosition(body, {
     x: SPAWN_X_CENTER + (Math.random() - 0.5) * 12,
-    y: 178,
+    y: 142,
   });
   Body.setVelocity(body, { x: 0, y: 0 });
   Body.setAngularVelocity(body, 0);
@@ -323,6 +327,55 @@ function vibrate(pattern) {
   if (navigator.vibrate) {
     navigator.vibrate(pattern);
   }
+}
+
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator) || wakeLock) {
+    return;
+  }
+
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => {
+      wakeLock = null;
+    });
+  } catch (_) {
+    wakeLock = null;
+  }
+}
+
+function setupWakeLock() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      requestWakeLock();
+    }
+  });
+}
+
+function unlockAudio() {
+  if (!popSound || audioUnlocked) {
+    return;
+  }
+
+  const previousVolume = popSound.volume;
+  popSound.volume = 0;
+  popSound.currentTime = 0;
+  popSound
+    .play()
+    .then(() => {
+      popSound.pause();
+      popSound.currentTime = 0;
+      popSound.volume = previousVolume;
+      audioUnlocked = true;
+    })
+    .catch(() => {
+      popSound.volume = previousVolume;
+    });
+}
+
+function activateMobileSession() {
+  unlockAudio();
+  requestWakeLock();
 }
 
 function getPointerPosition(event) {
@@ -424,19 +477,19 @@ function redrawConnectionLine() {
   lineGlow.clear();
   lineCore.clear();
 
-  if (selectedBalls.length < 2) {
+  if (selectedBalls.length === 0) {
     return;
   }
 
   lineGlow.lineStyle({
-    width: 18,
-    color: 0xff4fd8,
-    alpha: 0.22,
+    width: 22,
+    color: 0xff5bd8,
+    alpha: 0.34,
     cap: "round",
     join: "round",
   });
   lineCore.lineStyle({
-    width: 7,
+    width: 9,
     color: 0xff4fd8,
     alpha: 0.96,
     cap: "round",
@@ -452,6 +505,16 @@ function redrawConnectionLine() {
     lineGlow.lineTo(point.x, point.y);
     lineCore.lineTo(point.x, point.y);
   }
+
+  if (isDragging && dragPointerPosition) {
+    const last = selectedBalls[selectedBalls.length - 1].body.position;
+    const dx = dragPointerPosition.x - last.x;
+    const dy = dragPointerPosition.y - last.y;
+    if (Math.hypot(dx, dy) > BALL_RADIUS * 0.55) {
+      lineGlow.lineTo(dragPointerPosition.x, dragPointerPosition.y);
+      lineCore.lineTo(dragPointerPosition.x, dragPointerPosition.y);
+    }
+  }
 }
 
 function clearSelection() {
@@ -461,6 +524,7 @@ function clearSelection() {
 
   selectedBalls = [];
   selectedBodyIds.clear();
+  dragPointerPosition = null;
   lineGlow.clear();
   lineCore.clear();
 }
@@ -470,13 +534,16 @@ function handlePointerDown(event) {
     return;
   }
 
+  activateMobileSession();
   isDragging = true;
   clearSelection();
   const point = getPointerPosition(event);
   lastPointerPosition = point;
+  dragPointerPosition = point;
   for (const ball of findTouchedBalls(point, point)) {
     addSelectedBall(ball);
   }
+  redrawConnectionLine();
 }
 
 function handlePointerMove(event) {
@@ -485,6 +552,7 @@ function handlePointerMove(event) {
   }
 
   const point = getPointerPosition(event);
+  dragPointerPosition = point;
   for (const ball of findTouchedBalls(lastPointerPosition, point)) {
     addSelectedBall(ball);
   }
@@ -499,6 +567,7 @@ function handlePointerUp() {
 
   isDragging = false;
   lastPointerPosition = null;
+  dragPointerPosition = null;
 
   if (selectedBalls.length >= 2) {
     explodeSelectedBalls();
@@ -557,7 +626,7 @@ function burstParticles(x, y) {
 
 function explodeSelectedBalls() {
   const removing = new Set(selectedBalls.map((ball) => ball.body.id));
-  vibrate(50);
+  vibrate([22, 28, 42]);
   playPopSound();
 
   for (const ball of selectedBalls) {
@@ -571,6 +640,7 @@ function explodeSelectedBalls() {
   updateScoreText();
   selectedBalls = [];
   selectedBodyIds.clear();
+  dragPointerPosition = null;
   lineGlow.clear();
   lineCore.clear();
 }
@@ -605,9 +675,9 @@ function createInteractionLayers() {
   lineCore = new PIXI.Graphics();
   particleLayer = new PIXI.Container();
 
-  lineGlow.zIndex = 4;
-  lineCore.zIndex = 5;
-  particleLayer.zIndex = 7;
+  lineGlow.zIndex = 8;
+  lineCore.zIndex = 9;
+  particleLayer.zIndex = 10;
 
   app.stage.addChild(lineGlow);
   app.stage.addChild(lineCore);
@@ -628,6 +698,7 @@ function setupAudio() {
   popSound = new Audio("pop_bomb.wav");
   popSound.preload = "auto";
   popSound.volume = 0.72;
+  popSound.load();
 }
 
 function syncSprites() {
@@ -667,9 +738,9 @@ async function restartGame() {
 function createHud() {
   const topBar = new PIXI.Graphics();
   topBar.beginFill(0x0b1118, 0.34);
-  topBar.drawRoundedRect(18, 18, DESIGN_WIDTH - 36, 74, 16);
+  topBar.drawRoundedRect(18, HUD_TOP, DESIGN_WIDTH - 36, 58, 16);
   topBar.endFill();
-  topBar.zIndex = 10;
+  topBar.zIndex = 20;
   app.stage.addChild(topBar);
 
   const title = new PIXI.Text("TSUM DROP", {
@@ -678,8 +749,8 @@ function createHud() {
     fontSize: 20,
     fontWeight: "700",
   });
-  title.position.set(34, 28);
-  title.zIndex = 11;
+  title.position.set(34, HUD_TOP + 15);
+  title.zIndex = 21;
   app.stage.addChild(title);
 
   scoreText = new PIXI.Text("0", {
@@ -689,8 +760,8 @@ function createHud() {
     fontWeight: "700",
   });
   scoreText.anchor.set(0.5, 0);
-  scoreText.position.set(DESIGN_WIDTH / 2, 28);
-  scoreText.zIndex = 11;
+  scoreText.position.set(DESIGN_WIDTH / 2, HUD_TOP + 15);
+  scoreText.zIndex = 21;
   app.stage.addChild(scoreText);
 
   const restart = new PIXI.Text("RESTART", {
@@ -700,10 +771,10 @@ function createHud() {
     fontWeight: "700",
   });
   restart.anchor.set(1, 0);
-  restart.position.set(DESIGN_WIDTH - 34, 34);
+  restart.position.set(DESIGN_WIDTH - 34, HUD_TOP + 20);
   restart.eventMode = "static";
   restart.cursor = "pointer";
-  restart.zIndex = 11;
+  restart.zIndex = 21;
   restart.on("pointertap", () => {
     restartGame().catch(showFatalError);
   });
@@ -757,6 +828,7 @@ function showFatalError(error) {
 async function main() {
   await createPixiApp();
   setupAudio();
+  setupWakeLock();
   drawBackground();
   drawBottle();
   createInteractionLayers();
