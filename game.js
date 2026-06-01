@@ -5,15 +5,15 @@ const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 8;
 const SPAWN_INTERVAL_MS = 880;
 const BALL_RADIUS = 52;
-const BODY_RADIUS = 43;
+const BODY_RADIUS = 40;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
 const SPAWN_X_RANGE = 132;
-const SPAWN_Y = 172;
-const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 2.15;
+const SPAWN_Y = 246;
+const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.45;
 const MAX_BALLS = 120;
-const WALL_THICKNESS = 42;
+const WALL_THICKNESS = 34;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const HUD_TOP = 54;
@@ -473,13 +473,13 @@ function spawnBall() {
     restitution: 0.18,
     friction: 0.18,
     frictionStatic: 0.02,
-    frictionAir: 0.018,
+    frictionAir: 0.006,
     density: 0.00145,
   });
 
   Body.setVelocity(body, {
     x: (Math.random() - 0.5) * 0.7,
-    y: 1.25 + Math.random() * 0.35,
+    y: 2.35 + Math.random() * 0.45,
   });
   Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.18);
   Composite.add(engine.world, body);
@@ -507,7 +507,9 @@ function findOpenSpawnPoint() {
   }
 
   return attempts.find((point) => {
-    if (point.x < BOTTLE.leftNeckTop.x + BODY_RADIUS || point.x > BOTTLE.rightNeckTop.x - BODY_RADIUS) {
+    const leftLimit = point.y < 246 ? BOTTLE.leftNeckTop.x + BODY_RADIUS : BOTTLE.leftMouth.x + BODY_RADIUS;
+    const rightLimit = point.y < 246 ? BOTTLE.rightNeckTop.x - BODY_RADIUS : BOTTLE.rightMouth.x - BODY_RADIUS;
+    if (point.x < leftLimit || point.x > rightLimit) {
       return false;
     }
 
@@ -1733,7 +1735,7 @@ function finishLevel(passed) {
 
 function startPhysics() {
   engine = Engine.create({
-    gravity: { x: 0, y: 0.46, scale: 0.001 },
+    gravity: { x: 0, y: 1.12, scale: 0.001 },
     positionIterations: 10,
     velocityIterations: 8,
     constraintIterations: 4,
