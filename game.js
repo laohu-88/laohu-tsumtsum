@@ -4,7 +4,7 @@ const FIRST_SPRITE_ID = 76;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 5;
 const SPAWN_INTERVAL_MS = 880;
-const BALL_RADIUS = 40;
+const BALL_RADIUS = 46;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
@@ -13,7 +13,7 @@ const MAX_BALLS = 120;
 const WALL_THICKNESS = 42;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
 const HUD_TOP = 54;
-const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 50;
+const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 54;
 
 const BOTTLE = {
   leftNeckTop: { x: 132, y: 96 },
@@ -71,6 +71,7 @@ let selectBuffer = null;
 let keepAwakeVideo = null;
 let feedbackShakeFrames = 0;
 let feedbackShakeStrength = 0;
+let audioPrimed = false;
 
 const loadingEl = document.getElementById("loading");
 const gameRoot = document.getElementById("game-root");
@@ -351,7 +352,7 @@ function triggerHaptic(pattern = 18) {
   }
 
   const duration = Array.isArray(pattern) ? Math.max(...pattern) : pattern;
-  triggerVisualShake(duration >= 40 ? 9 : 5, duration >= 40 ? 4.5 : 2.6);
+  triggerVisualShake(duration >= 40 ? 16 : 10, duration >= 40 ? 12 : 7);
 }
 
 function triggerVisualShake(frames, strength) {
@@ -461,8 +462,9 @@ async function unlockAudio() {
   }
 
   try {
-    await loadSoundBuffers();
-    playSyntheticPop(0.001, 180, 0.02);
+    await ensureAudioContext();
+    primeSyntheticAudio();
+    loadSoundBuffers().catch(() => {});
     audioUnlocked = true;
     return;
   } catch (_) {
@@ -471,6 +473,14 @@ async function unlockAudio() {
 
   unlockHtmlAudio(selectSound);
   unlockHtmlAudio(popSound);
+}
+
+function primeSyntheticAudio() {
+  if (audioPrimed || !audioContext) {
+    return;
+  }
+
+  audioPrimed = playSyntheticPop(0.012, 240, 0.025);
 }
 
 function unlockHtmlAudio(sound) {
@@ -608,9 +618,22 @@ function addSelectedBall(ball) {
   selectedBalls.push(ball);
   selectedBodyIds.add(ball.body.id);
   ball.view.scale.set(1.18);
-  triggerHaptic(selectedBalls.length === 1 ? 24 : 38);
+  triggerBallShake(ball, selectedBalls.length === 1 ? 5 : 9);
+  triggerHaptic(selectedBalls.length === 1 ? 34 : 54);
   playSelectSound();
   redrawConnectionLine();
+}
+
+function triggerBallShake(ball, strength) {
+  if (!ball?.body) {
+    return;
+  }
+
+  Body.setVelocity(ball.body, {
+    x: ball.body.velocity.x + (Math.random() - 0.5) * strength * 0.35,
+    y: ball.body.velocity.y - strength * 0.12,
+  });
+  Body.setAngularVelocity(ball.body, ball.body.angularVelocity + (Math.random() - 0.5) * 0.18);
 }
 
 function redrawConnectionLine() {
@@ -675,6 +698,7 @@ function handlePointerDown(event) {
   }
 
   activateMobileSession();
+  playSyntheticPop(0.035, 300, 0.025);
   isDragging = true;
   clearSelection();
   const point = getPointerPosition(event);
@@ -771,27 +795,14 @@ function playSyntheticPop(volume = 0.18, frequency = 420, duration = 0.055) {
 }
 
 function playSelectSound() {
-  if (playSoundBuffer(selectBuffer, 0.36)) {
-    return;
-  }
-
-  if (playHtmlSound(selectSound)) {
-    return;
-  }
-
-  playSyntheticPop(0.11, 520, 0.035);
+  playSyntheticPop(0.18, 620, 0.045);
+  playSoundBuffer(selectBuffer, 0.36) || playHtmlSound(selectSound);
 }
 
 function playPopSound() {
-  if (playSoundBuffer(popBuffer, 0.95)) {
-    return;
-  }
-
-  if (playHtmlSound(popSound)) {
-    return;
-  }
-
-  playSyntheticPop(0.22, 360, 0.075);
+  playSyntheticPop(0.34, 330, 0.11);
+  setTimeout(() => playSyntheticPop(0.2, 180, 0.09), 38);
+  playSoundBuffer(popBuffer, 0.95) || playHtmlSound(popSound);
 }
 
 function makeStarParticle(x, y) {
@@ -835,9 +846,10 @@ function burstParticles(x, y) {
 
 function explodeSelectedBalls() {
   const removing = new Set(selectedBalls.map((ball) => ball.body.id));
-  triggerHaptic([60, 36, 90]);
+  triggerHaptic([90, 50, 130]);
 
   for (const ball of selectedBalls) {
+    triggerBallShake(ball, 14);
     burstParticles(ball.body.position.x, ball.body.position.y);
     Composite.remove(engine.world, ball.body);
     ball.view.destroy({ children: true });
@@ -940,7 +952,7 @@ function updateFeedbackShake() {
     return;
   }
 
-  const strength = feedbackShakeStrength * (feedbackShakeFrames / 9);
+  const strength = feedbackShakeStrength * (feedbackShakeFrames / 16);
   app.stage.position.set(
     (Math.random() - 0.5) * strength,
     (Math.random() - 0.5) * strength,
