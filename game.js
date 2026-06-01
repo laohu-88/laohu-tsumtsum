@@ -1,6 +1,7 @@
-const total_sprites = 126;
+const TOTAL_SPRITES = 126;
 
 const FIRST_SPRITE_ID = 76;
+const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 5;
 const SPAWN_INTERVAL_MS = 520;
 const BALL_RADIUS = 25;
@@ -73,12 +74,12 @@ function shuffle(values) {
 
 function pickRoundSprites() {
   const ids = [];
-  for (let id = FIRST_SPRITE_ID; id <= total_sprites; id += 1) {
+  for (let id = FIRST_SPRITE_ID; id <= LAST_SPRITE_ID; id += 1) {
     ids.push(id);
   }
 
   if (ids.length < PARTICIPANT_COUNT) {
-    throw new Error(`total_sprites must be at least ${FIRST_SPRITE_ID + PARTICIPANT_COUNT - 1}.`);
+    throw new Error(`TOTAL_SPRITES must be at least ${PARTICIPANT_COUNT}.`);
   }
 
   return shuffle(ids).slice(0, PARTICIPANT_COUNT);

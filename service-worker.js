@@ -1,4 +1,6 @@
-const CACHE_NAME = "laohu-tsumtsum-v1";
+const CACHE_NAME = "laohu-tsumtsum-v2";
+const FIRST_SPRITE_ID = 76;
+const TOTAL_SPRITES = 126;
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -7,7 +9,7 @@ const CORE_ASSETS = [
   "./pop_bomb.wav",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  ...Array.from({ length: 51 }, (_, index) => `./assets/${index + 76}.png`),
+  ...Array.from({ length: TOTAL_SPRITES }, (_, index) => `./assets/${index + FIRST_SPRITE_ID}.png`),
 ];
 
 self.addEventListener("install", (event) => {
