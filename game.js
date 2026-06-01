@@ -266,6 +266,10 @@ function isLevelComplete() {
     return false;
   }
 
+  if (currentLevel.infinite) {
+    return false;
+  }
+
   const goals = currentLevel.goals;
   return (!goals.score || score >= goals.score)
     && (!goals.targetClears || levelStats.targetClears >= goals.targetClears)
@@ -470,28 +474,11 @@ function makeCircularSprite(texture, isTarget = false) {
 
   if (isTarget) {
     const ring = new PIXI.Graphics();
-    ring.lineStyle(7, 0xff4b5f, 0.96);
-    ring.drawCircle(0, 0, BALL_RADIUS - 4);
-    ring.lineStyle(3, 0xffffff, 0.72);
+    ring.lineStyle(10, 0xff2f48, 0.98);
+    ring.drawCircle(0, 0, BALL_RADIUS - 5);
+    ring.lineStyle(3, 0xfff0f2, 0.78);
     ring.drawCircle(0, 0, BALL_RADIUS - 12);
     container.addChild(ring);
-
-    const badge = new PIXI.Graphics();
-    badge.beginFill(0xff263d, 0.96);
-    badge.lineStyle(3, 0xffffff, 0.9);
-    badge.drawCircle(BALL_RADIUS * 0.48, -BALL_RADIUS * 0.5, 18);
-    badge.endFill();
-    container.addChild(badge);
-
-    const label = new PIXI.Text("红", {
-      fill: 0xffffff,
-      fontFamily: "Arial, Microsoft YaHei, sans-serif",
-      fontSize: 20,
-      fontWeight: "800",
-    });
-    label.anchor.set(0.5);
-    label.position.set(BALL_RADIUS * 0.48, -BALL_RADIUS * 0.5 - 1);
-    container.addChild(label);
   }
 
   return container;
@@ -519,9 +506,10 @@ function spawnBall() {
   }
   const body = Bodies.circle(spawnPoint.x, spawnPoint.y, BODY_RADIUS, {
     restitution: 0.24,
-    friction: 0.035,
+    friction: 0.012,
     frictionStatic: 0,
     frictionAir: 0.004,
+    slop: 0.08,
     density: 0.00145,
   });
 
@@ -1404,20 +1392,25 @@ function createLevelObstacles() {
   }
 
   for (const obstacle of currentLevel?.obstacles || []) {
+    const collisionWidth = obstacle.collisionWidth || obstacle.width * 0.72;
+    const collisionHeight = obstacle.collisionHeight || Math.max(6, obstacle.height * 0.7);
+    const collisionRadius = obstacle.collisionRadius || obstacle.radius * 0.72;
     const body = obstacle.type === "bar"
-      ? Bodies.rectangle(obstacle.x, obstacle.y, obstacle.width, obstacle.height, {
+      ? Bodies.rectangle(obstacle.x, obstacle.y, collisionWidth, collisionHeight, {
         isStatic: true,
         angle: obstacle.angle || 0,
-        chamfer: { radius: 5 },
-        restitution: 0.78,
+        chamfer: { radius: Math.max(4, collisionHeight / 2) },
+        restitution: 0.36,
         friction: 0,
         frictionStatic: 0,
+        slop: 0.12,
       })
-      : Bodies.circle(obstacle.x, obstacle.y, obstacle.radius, {
+      : Bodies.circle(obstacle.x, obstacle.y, collisionRadius, {
         isStatic: true,
-        restitution: 0.82,
+        restitution: 0.34,
         friction: 0,
         frictionStatic: 0,
+        slop: 0.12,
       });
     const view = createObstacleView(obstacle);
     Composite.add(engine.world, body);
@@ -1795,7 +1788,7 @@ function finishLevel(passed) {
 
   gameStarted = false;
   clearSelection();
-  if (passed && currentLevel) {
+  if (passed && currentLevel && !currentLevel.infinite) {
     saveProgress(currentLevel.id);
   }
   showResultOverlay(passed);
