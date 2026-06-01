@@ -13,6 +13,7 @@ const SPAWN_X_RANGE = 132;
 const MAX_BALLS = 120;
 const WALL_THICKNESS = 42;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
+const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 54;
 
@@ -451,7 +452,7 @@ async function loadAudioBuffer(path) {
 
 async function loadSoundBuffers() {
   if (!linkBuffer) {
-    linkBuffer = await loadAudioBuffer("link.wav");
+    linkBuffer = await loadAudioBuffer(CONNECT_SOUND_PATH);
   }
 
   if (!popBuffer) {
@@ -728,16 +729,16 @@ function redrawConnectionLine() {
   }
 
   lineGlow.lineStyle({
-    width: 34,
-    color: 0x12d8ff,
-    alpha: 0.48,
+    width: 58,
+    color: 0xffffff,
+    alpha: 0.86,
     cap: "round",
     join: "round",
   });
   lineCore.lineStyle({
-    width: 14,
-    color: 0xffff66,
-    alpha: 0.98,
+    width: 25,
+    color: 0x08f7ff,
+    alpha: 1,
     cap: "round",
     join: "round",
   });
@@ -753,23 +754,18 @@ function redrawConnectionLine() {
   }
 
   if (isDragging && dragPointerPosition) {
-    const last = selectedBalls[selectedBalls.length - 1].body.position;
-    const dx = dragPointerPosition.x - last.x;
-    const dy = dragPointerPosition.y - last.y;
-    if (Math.hypot(dx, dy) > BALL_RADIUS * 0.55) {
-      lineGlow.lineTo(dragPointerPosition.x, dragPointerPosition.y);
-      lineCore.lineTo(dragPointerPosition.x, dragPointerPosition.y);
-    }
+    lineGlow.lineTo(dragPointerPosition.x, dragPointerPosition.y);
+    lineCore.lineTo(dragPointerPosition.x, dragPointerPosition.y);
   }
 
   for (const ball of selectedBalls) {
     const point = ball.body.position;
-    lineNodes.lineStyle(8, 0x12d8ff, 0.58);
-    lineNodes.beginFill(0xffff66, 0.28);
-    lineNodes.drawCircle(point.x, point.y, BALL_RADIUS * 0.78);
+    lineNodes.lineStyle(12, 0xffffff, 0.9);
+    lineNodes.beginFill(0x08f7ff, 0.5);
+    lineNodes.drawCircle(point.x, point.y, BALL_RADIUS * 0.9);
     lineNodes.endFill();
-    lineNodes.lineStyle(3, 0xffffff, 0.92);
-    lineNodes.drawCircle(point.x, point.y, BALL_RADIUS * 0.64);
+    lineNodes.lineStyle(5, 0xffff44, 1);
+    lineNodes.drawCircle(point.x, point.y, BALL_RADIUS * 0.68);
   }
 }
 
@@ -896,7 +892,7 @@ function playSyntheticPop(volume = 0.18, frequency = 420, duration = 0.055) {
 }
 
 function playSelectSound() {
-  playSoundBuffer(linkBuffer, 0.22) || playHtmlSound(linkSound);
+  playSoundBuffer(linkBuffer, 0.32) || playHtmlSound(linkSound);
 }
 
 function playPopSound() {
@@ -997,9 +993,9 @@ function createInteractionLayers() {
   lineNodes = new PIXI.Graphics();
   particleLayer = new PIXI.Container();
 
-  lineGlow.zIndex = 8;
-  lineCore.zIndex = 9;
-  lineNodes.zIndex = 10;
+  lineGlow.zIndex = 30;
+  lineCore.zIndex = 31;
+  lineNodes.zIndex = 32;
   particleLayer.zIndex = 11;
 
   app.stage.addChild(lineGlow);
@@ -1031,9 +1027,9 @@ function setupAudioUnlockEvents() {
 }
 
 function setupAudio() {
-  linkSound = new Audio("link.wav");
+  linkSound = new Audio(CONNECT_SOUND_PATH);
   linkSound.preload = "auto";
-  linkSound.volume = 0.18;
+  linkSound.volume = 0.32;
   linkSound.load();
 
   popSound = new Audio("pop_bomb.wav");

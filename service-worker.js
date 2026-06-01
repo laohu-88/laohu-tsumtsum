@@ -1,11 +1,14 @@
-const CACHE_NAME = "laohu-tsumtsum-v10";
+const CACHE_NAME = "laohu-tsumtsum-v11";
 const FIRST_SPRITE_ID = 76;
 const TOTAL_SPRITES = 126;
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./game.js",
+  "./game.js?v=11",
   "./manifest.json",
+  "./connect.wav",
+  "./connect.wav?v=11",
   "./link.wav",
   "./pop.wav",
   "./pop_bomb.wav",
