@@ -13,6 +13,7 @@ const MAX_BALLS = 120;
 const WALL_THICKNESS = 42;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
 const HUD_TOP = 54;
+const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 10;
 
 const BOTTLE = {
   leftNeckTop: { x: 132, y: 96 },
@@ -21,12 +22,12 @@ const BOTTLE = {
   rightMouth: { x: 348, y: 210 },
   leftShoulder: { x: 34, y: 318 },
   rightShoulder: { x: 396, y: 318 },
-  leftLowerSide: { x: 18, y: 826 },
-  rightLowerSide: { x: 412, y: 826 },
-  leftHeel: { x: 42, y: 895 },
-  rightHeel: { x: 388, y: 895 },
-  leftFloor: { x: 94, y: 920 },
-  rightFloor: { x: 336, y: 920 },
+  leftLowerSide: { x: 18, y: 806 },
+  rightLowerSide: { x: 412, y: 806 },
+  leftHeel: { x: 44, y: 868 },
+  rightHeel: { x: 386, y: 868 },
+  leftFloor: { x: 98, y: BOTTOM_SAFE_Y },
+  rightFloor: { x: 332, y: BOTTOM_SAFE_Y },
 };
 
 const {
@@ -63,6 +64,9 @@ let dragPointerPosition = null;
 let score = 0;
 let audioUnlocked = false;
 let wakeLock = null;
+let audioContext = null;
+let popBuffer = null;
+let keepAwakeVideo = null;
 
 const loadingEl = document.getElementById("loading");
 const gameRoot = document.getElementById("game-root");
@@ -178,9 +182,9 @@ function drawBottle() {
   bottle.moveTo(BOTTLE.rightNeckTop.x - 10, BOTTLE.rightNeckTop.y + 12);
   bottle.lineTo(BOTTLE.rightMouth.x - 10, BOTTLE.rightMouth.y - 14);
   bottle.moveTo(114, 292);
-  bottle.quadraticCurveTo(62, 500, 82, 838);
+  bottle.quadraticCurveTo(62, 486, 84, 808);
   bottle.moveTo(316, 344);
-  bottle.quadraticCurveTo(380, 570, 348, 852);
+  bottle.quadraticCurveTo(380, 548, 346, 824);
 
   bottle.zIndex = 2;
   app.stage.addChild(bottle);
@@ -329,6 +333,15 @@ function vibrate(pattern) {
   }
 }
 
+function triggerHaptic(pattern = 18) {
+  vibrate(pattern);
+
+  const haptics = window.Capacitor?.Plugins?.Haptics;
+  if (haptics?.impact) {
+    haptics.impact({ style: "medium" }).catch(() => {});
+  }
+}
+
 async function requestWakeLock() {
   if (!("wakeLock" in navigator) || wakeLock) {
     return;
@@ -348,34 +361,108 @@ function setupWakeLock() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       requestWakeLock();
+      playKeepAwakeVideo();
     }
   });
 }
 
-function unlockAudio() {
-  if (!popSound || audioUnlocked) {
+async function ensureAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return null;
+  }
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+
+  if (audioContext.state === "suspended") {
+    await audioContext.resume();
+  }
+
+  return audioContext;
+}
+
+async function loadPopBuffer() {
+  const context = await ensureAudioContext();
+  if (!context || popBuffer) {
     return;
   }
 
-  const previousVolume = popSound.volume;
-  popSound.volume = 0;
-  popSound.currentTime = 0;
-  popSound
-    .play()
-    .then(() => {
-      popSound.pause();
-      popSound.currentTime = 0;
-      popSound.volume = previousVolume;
-      audioUnlocked = true;
-    })
-    .catch(() => {
-      popSound.volume = previousVolume;
-    });
+  const response = await fetch("pop_bomb.wav", { cache: "force-cache" });
+  const arrayBuffer = await response.arrayBuffer();
+  popBuffer = await context.decodeAudioData(arrayBuffer);
+}
+
+function playKeepAwakeVideo() {
+  if (!keepAwakeVideo) {
+    return;
+  }
+
+  keepAwakeVideo.play().catch(() => {});
+}
+
+function setupKeepAwakeVideo() {
+  if (!HTMLCanvasElement.prototype.captureStream) {
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 2;
+  canvas.height = 2;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#000";
+  context.fillRect(0, 0, 2, 2);
+
+  keepAwakeVideo = document.createElement("video");
+  keepAwakeVideo.muted = true;
+  keepAwakeVideo.loop = true;
+  keepAwakeVideo.playsInline = true;
+  keepAwakeVideo.setAttribute("playsinline", "");
+  keepAwakeVideo.style.position = "fixed";
+  keepAwakeVideo.style.width = "1px";
+  keepAwakeVideo.style.height = "1px";
+  keepAwakeVideo.style.opacity = "0";
+  keepAwakeVideo.style.pointerEvents = "none";
+  keepAwakeVideo.srcObject = canvas.captureStream(1);
+  document.body.appendChild(keepAwakeVideo);
+}
+
+async function unlockAudio() {
+  if (audioUnlocked) {
+    return;
+  }
+
+  try {
+    await loadPopBuffer();
+    audioUnlocked = true;
+    return;
+  } catch (_) {
+    audioUnlocked = false;
+  }
+
+  if (popSound) {
+    const previousVolume = popSound.volume;
+    popSound.volume = 0;
+    popSound.currentTime = 0;
+    popSound
+      .play()
+      .then(() => {
+        popSound.pause();
+        popSound.currentTime = 0;
+        popSound.volume = previousVolume;
+        audioUnlocked = true;
+      })
+      .catch(() => {
+        popSound.volume = previousVolume;
+      });
+  }
 }
 
 function activateMobileSession() {
   unlockAudio();
   requestWakeLock();
+  playKeepAwakeVideo();
 }
 
 function getPointerPosition(event) {
@@ -408,12 +495,29 @@ function getBallByBody(body) {
   return balls.find((ball) => ball.body === body);
 }
 
+function findNearestTouchedBall(point) {
+  let nearest = null;
+  let nearestDistanceSq = (BALL_RADIUS * 1.65) ** 2;
+
+  for (const ball of balls) {
+    const dx = ball.body.position.x - point.x;
+    const dy = ball.body.position.y - point.y;
+    const distanceSq = dx * dx + dy * dy;
+    if (distanceSq < nearestDistanceSq) {
+      nearest = ball;
+      nearestDistanceSq = distanceSq;
+    }
+  }
+
+  return nearest;
+}
+
 function findTouchedBalls(start, end) {
   const bodies = balls.map((ball) => ball.body);
   const bodyIds = new Set();
   const touched = [];
 
-  const collisions = Query.ray(bodies, start, end, BALL_RADIUS * 1.15);
+  const collisions = Query.ray(bodies, start, end, BALL_RADIUS * 1.8);
   for (const collision of collisions) {
     const body = balls.some((ball) => ball.body === collision.bodyA) ? collision.bodyA : collision.bodyB;
     const ball = getBallByBody(body);
@@ -423,7 +527,7 @@ function findTouchedBalls(start, end) {
     }
   }
 
-  const radiusSq = (BALL_RADIUS * 1.35) ** 2;
+  const radiusSq = (BALL_RADIUS * 1.75) ** 2;
   for (const ball of balls) {
     if (bodyIds.has(ball.body.id)) {
       continue;
@@ -469,7 +573,7 @@ function addSelectedBall(ball) {
   selectedBalls.push(ball);
   selectedBodyIds.add(ball.body.id);
   ball.view.scale.set(1.14);
-  vibrate(15);
+  triggerHaptic(18);
   redrawConnectionLine();
 }
 
@@ -540,7 +644,15 @@ function handlePointerDown(event) {
   const point = getPointerPosition(event);
   lastPointerPosition = point;
   dragPointerPosition = point;
-  for (const ball of findTouchedBalls(point, point)) {
+  const touchedBalls = findTouchedBalls(point, point);
+  if (touchedBalls.length === 0) {
+    const nearest = findNearestTouchedBall(point);
+    if (nearest) {
+      touchedBalls.push(nearest);
+    }
+  }
+
+  for (const ball of touchedBalls) {
     addSelectedBall(ball);
   }
   redrawConnectionLine();
@@ -577,6 +689,17 @@ function handlePointerUp() {
 }
 
 function playPopSound() {
+  if (audioContext && popBuffer) {
+    const source = audioContext.createBufferSource();
+    const gain = audioContext.createGain();
+    source.buffer = popBuffer;
+    gain.gain.value = 0.85;
+    source.connect(gain);
+    gain.connect(audioContext.destination);
+    source.start(0);
+    return;
+  }
+
   if (!popSound) {
     return;
   }
@@ -626,7 +749,7 @@ function burstParticles(x, y) {
 
 function explodeSelectedBalls() {
   const removing = new Set(selectedBalls.map((ball) => ball.body.id));
-  vibrate([22, 28, 42]);
+  triggerHaptic([28, 24, 52]);
   playPopSound();
 
   for (const ball of selectedBalls) {
@@ -829,6 +952,7 @@ async function main() {
   await createPixiApp();
   setupAudio();
   setupWakeLock();
+  setupKeepAwakeVideo();
   drawBackground();
   drawBottle();
   createInteractionLayers();

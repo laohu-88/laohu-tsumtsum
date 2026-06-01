@@ -1,0 +1,13 @@
+Original/
+sounds/
+sszdy_assets/
+*.apk
+*.ipa
+*.aab
+*.keystore
+*.jks
+.DS_Store
+Thumbs.db
+node_modules/
+dist/
+build/
