@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>松松音效试听</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #111820;
+        color: #f5f7fb;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+      }
+
+      h1 {
+        margin: 0 0 18px;
+        font-size: 22px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 10px;
+      }
+
+      button {
+        min-height: 48px;
+        padding: 10px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        background: #203044;
+        color: #fff;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #2b405c;
+      }
+
+      .hint {
+        margin: 0 0 20px;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>松松音效试听</h1>
+    <p class="hint">逐个试听，找到最像“消除”的那个文件名后告诉我，我会把游戏里的 pop.wav 换成它。</p>
+    <div id="sound-list" class="grid"></div>
+
+    <script>
+      const candidates = [
+        "AudioClip_5252254774409161028_se_gift_link.wav",
+        "AudioClip_2159524120655074509_se_selected.wav",
+        "AudioClip_1287756332214743699_sound26.wav",
+        "AudioClip_7915362922845080411_sound14.wav",
+        "AudioClip_-3395999759475206875_se_click.wav",
+        "AudioClip_2953790021721485601_se_album_drop.wav",
+        "AudioClip_-3946803943613443588_se_tsum_levelup_score.wav",
+        "AudioClip_6382746207178790175_se_album_drag.wav",
+        "AudioClip_-1574608164445854332_se_bubble_tsum.wav",
+        "AudioClip_-2915276792934316780_sound57.wav",
+        "AudioClip_-8727003155185609716_se_tsum_shower.wav",
+        "AudioClip_-8704260097008470775_se_cleanup_spider.wav",
+        "AudioClip_-3853757939048229808_se_click_exp_bomb.wav",
+        "AudioClip_-2525323594807690656_se_gantu_explode.wav",
+        "AudioClip_2529256906692343679_se_bomb.wav",
+        "AudioClip_-1883779702499493150_se_hook_explode.wav",
+        "AudioClip_-2552366792577199521_se_cleanup_swipe.wav",
+      ];
+
+      let currentAudio = null;
+      const list = document.getElementById("sound-list");
+
+      for (const name of candidates) {
+        const button = document.createElement("button");
+        button.textContent = name;
+        button.addEventListener("click", () => {
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+          }
+
+          currentAudio = new Audio(`sounds/${name}`);
+          currentAudio.volume = 0.85;
+          currentAudio.play();
+        });
+        list.appendChild(button);
+      }
+    </script>
+  </body>
+</html>
