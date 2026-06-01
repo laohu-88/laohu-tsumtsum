@@ -10,6 +10,8 @@ const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
 const SPAWN_X_RANGE = 132;
+const SPAWN_Y = 172;
+const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 2.15;
 const MAX_BALLS = 120;
 const WALL_THICKNESS = 42;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
@@ -368,8 +370,9 @@ function wallFromSegment(start, end, thickness = WALL_THICKNESS) {
     {
       isStatic: true,
       angle,
-      restitution: 0.2,
-      friction: 0.92,
+      restitution: 0.26,
+      friction: 0.08,
+      frictionStatic: 0,
       render: { visible: false },
     },
   );
@@ -457,19 +460,27 @@ function spawnBall() {
     return;
   }
 
-  const x = SPAWN_X_CENTER + (Math.random() - 0.5) * SPAWN_X_RANGE;
-  const y = 134 + Math.random() * 8;
+  const spawnPoint = findOpenSpawnPoint();
+  if (!spawnPoint) {
+    return;
+  }
+
   let textureEntry = textures[Math.floor(Math.random() * textures.length)];
   if (currentLevelTargetSpriteId && Math.random() < (currentLevel?.targetWeight || 0.2)) {
     textureEntry = textures.find((entry) => entry.id === currentLevelTargetSpriteId) || textureEntry;
   }
-  const body = Bodies.circle(x, y, BODY_RADIUS, {
-    restitution: 0.12,
-    friction: 0.86,
-    frictionAir: 0.034,
+  const body = Bodies.circle(spawnPoint.x, spawnPoint.y, BODY_RADIUS, {
+    restitution: 0.18,
+    friction: 0.18,
+    frictionStatic: 0.02,
+    frictionAir: 0.018,
     density: 0.00145,
   });
 
+  Body.setVelocity(body, {
+    x: (Math.random() - 0.5) * 0.7,
+    y: 1.25 + Math.random() * 0.35,
+  });
   Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.18);
   Composite.add(engine.world, body);
 
@@ -477,6 +488,35 @@ function spawnBall() {
   view.zIndex = 3;
   app.stage.addChild(view);
   balls.push({ body, view, spriteId: textureEntry.id });
+}
+
+function findOpenSpawnPoint() {
+  const attempts = [
+    { x: SPAWN_X_CENTER, y: SPAWN_Y },
+    { x: SPAWN_X_CENTER - 34, y: SPAWN_Y + 8 },
+    { x: SPAWN_X_CENTER + 34, y: SPAWN_Y + 8 },
+    { x: SPAWN_X_CENTER - 66, y: SPAWN_Y + 20 },
+    { x: SPAWN_X_CENTER + 66, y: SPAWN_Y + 20 },
+  ];
+
+  for (let i = 0; i < 7; i += 1) {
+    attempts.push({
+      x: SPAWN_X_CENTER + (Math.random() - 0.5) * SPAWN_X_RANGE,
+      y: SPAWN_Y + Math.random() * 30,
+    });
+  }
+
+  return attempts.find((point) => {
+    if (point.x < BOTTLE.leftNeckTop.x + BODY_RADIUS || point.x > BOTTLE.rightNeckTop.x - BODY_RADIUS) {
+      return false;
+    }
+
+    return balls.every((ball) => {
+      const dx = ball.body.position.x - point.x;
+      const dy = ball.body.position.y - point.y;
+      return Math.hypot(dx, dy) >= SPAWN_MIN_CLEARANCE;
+    });
+  }) || null;
 }
 
 function isOutsideBottleSafetyZone(body) {
@@ -499,7 +539,7 @@ function isOutsideBottleSafetyZone(body) {
 function returnEscapedBall(body) {
   Body.setPosition(body, {
     x: SPAWN_X_CENTER + (Math.random() - 0.5) * 12,
-    y: 142,
+    y: SPAWN_Y,
   });
   Body.setVelocity(body, { x: 0, y: 0 });
   Body.setAngularVelocity(body, 0);
@@ -608,7 +648,7 @@ function ensureAudioContextSync() {
 }
 
 async function loadAudioBuffer(path) {
-  const context = await ensureAudioContext();
+  const context = ensureAudioContextSync();
   if (!context) {
     return null;
   }
@@ -619,13 +659,14 @@ async function loadAudioBuffer(path) {
 }
 
 async function loadSoundBuffers() {
-  if (!linkBuffer) {
-    linkBuffer = await loadAudioBuffer(CONNECT_SOUND_PATH);
-  }
-
-  if (!popBuffer) {
-    popBuffer = await loadAudioBuffer("pop_bomb.wav");
-  }
+  await Promise.all([
+    linkBuffer ? Promise.resolve() : loadAudioBuffer(CONNECT_SOUND_PATH).then((buffer) => {
+      linkBuffer = buffer;
+    }),
+    popBuffer ? Promise.resolve() : loadAudioBuffer("pop_bomb.wav").then((buffer) => {
+      popBuffer = buffer;
+    }),
+  ]);
 }
 
 function playKeepAwakeVideo() {
@@ -1308,13 +1349,16 @@ function createLevelObstacles() {
       ? Bodies.rectangle(obstacle.x, obstacle.y, obstacle.width, obstacle.height, {
         isStatic: true,
         angle: obstacle.angle || 0,
-        restitution: 0.45,
-        friction: 0.72,
+        chamfer: { radius: 8 },
+        restitution: 0.52,
+        friction: 0.04,
+        frictionStatic: 0,
       })
       : Bodies.circle(obstacle.x, obstacle.y, obstacle.radius, {
         isStatic: true,
         restitution: obstacle.type === "bumper" ? 0.88 : 0.38,
-        friction: 0.55,
+        friction: obstacle.type === "bumper" ? 0.02 : 0.04,
+        frictionStatic: 0,
       });
     const view = createObstacleView(obstacle);
     Composite.add(engine.world, body);
