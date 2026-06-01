@@ -3,21 +3,21 @@ const TOTAL_SPRITES = 422;
 const FIRST_SPRITE_ID = 1;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 8;
-const SPAWN_INTERVAL_MS = 880;
+const SPAWN_INTERVAL_MS = 760;
 const BALL_RADIUS = 52;
 const BODY_RADIUS = 40;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
-const SPAWN_X_RANGE = 132;
+const SPAWN_X_RANGE = 178;
 const SPAWN_Y = 246;
-const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.45;
-const MAX_BALLS = 120;
+const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.32;
+const MAX_BALLS = 148;
 const WALL_THICKNESS = 34;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.25;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const HUD_TOP = 54;
-const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 54;
+const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 30;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
 
 const LEVELS = [
@@ -41,9 +41,9 @@ const LEVELS = [
     targetWeight: 0.18,
     background: { top: 0x334a8f, bottom: 0x171c35, accent: 0xff8fb3, glow: 0x72f0ff },
     obstacles: [
-      { type: "bumper", x: 130, y: 420, radius: 28 },
-      { type: "bumper", x: 300, y: 508, radius: 30 },
-      { type: "bar", x: 215, y: 628, width: 152, height: 18, angle: -0.18 },
+      { type: "pin", x: 118, y: 430, radius: 14 },
+      { type: "pin", x: 312, y: 516, radius: 14 },
+      { type: "bar", x: 215, y: 638, width: 96, height: 10, angle: -0.18 },
     ],
   },
   {
@@ -56,11 +56,11 @@ const LEVELS = [
     targetWeight: 0.34,
     background: { top: 0x5e3f9d, bottom: 0x1f1631, accent: 0xf8bd5b, glow: 0x9af59a },
     obstacles: [
-      { type: "pin", x: 112, y: 390, radius: 18 },
-      { type: "pin", x: 318, y: 390, radius: 18 },
-      { type: "bumper", x: 215, y: 544, radius: 34 },
-      { type: "bar", x: 140, y: 694, width: 126, height: 16, angle: 0.23 },
-      { type: "bar", x: 290, y: 694, width: 126, height: 16, angle: -0.23 },
+      { type: "pin", x: 100, y: 398, radius: 12 },
+      { type: "pin", x: 330, y: 398, radius: 12 },
+      { type: "pin", x: 215, y: 546, radius: 16 },
+      { type: "bar", x: 138, y: 702, width: 84, height: 10, angle: 0.23 },
+      { type: "bar", x: 292, y: 702, width: 84, height: 10, angle: -0.23 },
     ],
   },
   {
@@ -72,11 +72,11 @@ const LEVELS = [
     targetWeight: 0.16,
     background: { top: 0x164f77, bottom: 0x111d24, accent: 0xfff176, glow: 0xff9f7a },
     obstacles: [
-      { type: "bar", x: 152, y: 372, width: 132, height: 18, angle: 0.32 },
-      { type: "bar", x: 278, y: 372, width: 132, height: 18, angle: -0.32 },
-      { type: "bumper", x: 116, y: 568, radius: 26 },
-      { type: "bumper", x: 314, y: 568, radius: 26 },
-      { type: "pin", x: 215, y: 724, radius: 22 },
+      { type: "bar", x: 136, y: 378, width: 92, height: 10, angle: 0.32 },
+      { type: "bar", x: 294, y: 378, width: 92, height: 10, angle: -0.32 },
+      { type: "pin", x: 100, y: 574, radius: 13 },
+      { type: "pin", x: 330, y: 574, radius: 13 },
+      { type: "pin", x: 215, y: 730, radius: 15 },
     ],
   },
   {
@@ -89,29 +89,46 @@ const LEVELS = [
     targetWeight: 0.38,
     background: { top: 0x7a3047, bottom: 0x20121a, accent: 0x73f7cf, glow: 0xffd66e },
     obstacles: [
-      { type: "bumper", x: 110, y: 386, radius: 27 },
-      { type: "bumper", x: 320, y: 386, radius: 27 },
-      { type: "pin", x: 215, y: 482, radius: 20 },
-      { type: "bar", x: 150, y: 604, width: 132, height: 17, angle: -0.28 },
-      { type: "bar", x: 280, y: 604, width: 132, height: 17, angle: 0.28 },
-      { type: "bumper", x: 215, y: 752, radius: 30 },
+      { type: "pin", x: 98, y: 392, radius: 13 },
+      { type: "pin", x: 332, y: 392, radius: 13 },
+      { type: "pin", x: 215, y: 492, radius: 14 },
+      { type: "bar", x: 144, y: 616, width: 90, height: 10, angle: -0.28 },
+      { type: "bar", x: 286, y: 616, width: 90, height: 10, angle: 0.28 },
+      { type: "pin", x: 215, y: 758, radius: 16 },
+    ],
+  },
+  {
+    id: 6,
+    name: "无限关",
+    subtitle: "刷分到满仓",
+    duration: null,
+    infinite: true,
+    goals: {},
+    targetWeight: 0.18,
+    background: { top: 0x217a64, bottom: 0x101a22, accent: 0xffd66e, glow: 0x7fffd4 },
+    obstacles: [
+      { type: "pin", x: 104, y: 430, radius: 12 },
+      { type: "pin", x: 326, y: 430, radius: 12 },
+      { type: "bar", x: 215, y: 590, width: 82, height: 9, angle: 0.16 },
+      { type: "pin", x: 150, y: 724, radius: 12 },
+      { type: "pin", x: 280, y: 724, radius: 12 },
     ],
   },
 ];
 
 const BOTTLE = {
-  leftNeckTop: { x: 132, y: 96 },
-  rightNeckTop: { x: 298, y: 96 },
-  leftMouth: { x: 82, y: 210 },
-  rightMouth: { x: 348, y: 210 },
-  leftShoulder: { x: 34, y: 318 },
-  rightShoulder: { x: 396, y: 318 },
-  leftLowerSide: { x: 18, y: 782 },
-  rightLowerSide: { x: 412, y: 782 },
-  leftHeel: { x: 44, y: 836 },
-  rightHeel: { x: 386, y: 836 },
-  leftFloor: { x: 98, y: BOTTOM_SAFE_Y },
-  rightFloor: { x: 332, y: BOTTOM_SAFE_Y },
+  leftNeckTop: { x: 116, y: 94 },
+  rightNeckTop: { x: 314, y: 94 },
+  leftMouth: { x: 54, y: 204 },
+  rightMouth: { x: 376, y: 204 },
+  leftShoulder: { x: 12, y: 312 },
+  rightShoulder: { x: 418, y: 312 },
+  leftLowerSide: { x: 6, y: 806 },
+  rightLowerSide: { x: 424, y: 806 },
+  leftHeel: { x: 32, y: 856 },
+  rightHeel: { x: 398, y: 856 },
+  leftFloor: { x: 66, y: BOTTOM_SAFE_Y },
+  rightFloor: { x: 364, y: BOTTOM_SAFE_Y },
 };
 
 const {
@@ -172,6 +189,7 @@ let unlockedLevel = 1;
 let currentLevel = null;
 let currentLevelTargetSpriteId = null;
 let levelTimeLeftMs = 0;
+let levelEndReason = "";
 let levelStats = {
   targetClears: 0,
   clears: 0,
@@ -216,10 +234,17 @@ function saveProgress(levelId) {
 }
 
 function formatTime(ms) {
+  if (!Number.isFinite(ms)) {
+    return "∞";
+  }
   return `${Math.max(0, Math.ceil(ms / 1000))}s`;
 }
 
 function describeGoals(level) {
+  if (level.infinite) {
+    return "无限刷分，满仓结束";
+  }
+
   const goals = [];
   if (level.goals.score) {
     goals.push(`${level.goals.score}分`);
@@ -370,8 +395,8 @@ function wallFromSegment(start, end, thickness = WALL_THICKNESS) {
     {
       isStatic: true,
       angle,
-      restitution: 0.26,
-      friction: 0.08,
+      restitution: 0.34,
+      friction: 0.015,
       frictionStatic: 0,
       render: { visible: false },
     },
@@ -450,18 +475,41 @@ function makeCircularSprite(texture, isTarget = false) {
     ring.lineStyle(3, 0xffffff, 0.72);
     ring.drawCircle(0, 0, BALL_RADIUS - 12);
     container.addChild(ring);
+
+    const badge = new PIXI.Graphics();
+    badge.beginFill(0xff263d, 0.96);
+    badge.lineStyle(3, 0xffffff, 0.9);
+    badge.drawCircle(BALL_RADIUS * 0.48, -BALL_RADIUS * 0.5, 18);
+    badge.endFill();
+    container.addChild(badge);
+
+    const label = new PIXI.Text("红", {
+      fill: 0xffffff,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 20,
+      fontWeight: "800",
+    });
+    label.anchor.set(0.5);
+    label.position.set(BALL_RADIUS * 0.48, -BALL_RADIUS * 0.5 - 1);
+    container.addChild(label);
   }
 
   return container;
 }
 
 function spawnBall() {
-  if (!gameStarted || textures.length === 0 || balls.length >= MAX_BALLS) {
+  if (!gameStarted || textures.length === 0) {
+    return;
+  }
+
+  if (balls.length >= MAX_BALLS) {
+    finishFullLevel();
     return;
   }
 
   const spawnPoint = findOpenSpawnPoint();
   if (!spawnPoint) {
+    finishFullLevel();
     return;
   }
 
@@ -470,10 +518,10 @@ function spawnBall() {
     textureEntry = textures.find((entry) => entry.id === currentLevelTargetSpriteId) || textureEntry;
   }
   const body = Bodies.circle(spawnPoint.x, spawnPoint.y, BODY_RADIUS, {
-    restitution: 0.18,
-    friction: 0.18,
-    frictionStatic: 0.02,
-    frictionAir: 0.006,
+    restitution: 0.24,
+    friction: 0.035,
+    frictionStatic: 0,
+    frictionAir: 0.004,
     density: 0.00145,
   });
 
@@ -488,6 +536,7 @@ function spawnBall() {
   view.zIndex = 3;
   app.stage.addChild(view);
   balls.push({ body, view, spriteId: textureEntry.id });
+  updateGoalText();
 }
 
 function findOpenSpawnPoint() {
@@ -1315,21 +1364,29 @@ function clearLevelObstacles() {
 
 function createObstacleView(obstacle) {
   const view = new PIXI.Graphics();
-  view.lineStyle(4, 0xffffff, 0.55);
-  view.beginFill(0x0c121a, 0.68);
+  const accent = currentLevel?.background?.accent || 0xffd66e;
+  view.lineStyle(3, 0xffffff, 0.62);
+  view.beginFill(0x0c121a, 0.48);
 
   if (obstacle.type === "bar") {
-    view.drawRoundedRect(-obstacle.width / 2, -obstacle.height / 2, obstacle.width, obstacle.height, 8);
+    view.drawRoundedRect(-obstacle.width / 2, -obstacle.height / 2, obstacle.width, obstacle.height, 5);
   } else {
     view.drawCircle(0, 0, obstacle.radius);
   }
 
   view.endFill();
-  view.beginFill(currentLevel?.background?.accent || 0xffd66e, 0.28);
+  view.beginFill(accent, 0.68);
   if (obstacle.type === "bar") {
-    view.drawRoundedRect(-obstacle.width / 2 + 8, -obstacle.height / 2 + 4, obstacle.width - 16, 4, 2);
+    view.drawRoundedRect(-obstacle.width / 2 + 6, -2, obstacle.width - 12, 4, 2);
   } else {
-    view.drawCircle(-obstacle.radius * 0.28, -obstacle.radius * 0.28, obstacle.radius * 0.34);
+    view.drawCircle(0, 0, Math.max(4, obstacle.radius * 0.42));
+    view.endFill();
+    view.lineStyle(2, accent, 0.9);
+    view.moveTo(-obstacle.radius * 1.45, 0);
+    view.lineTo(obstacle.radius * 1.45, 0);
+    view.moveTo(0, -obstacle.radius * 1.45);
+    view.lineTo(0, obstacle.radius * 1.45);
+    view.beginFill(accent, 0.28);
   }
   view.endFill();
   view.position.set(obstacle.x, obstacle.y);
@@ -1351,15 +1408,15 @@ function createLevelObstacles() {
       ? Bodies.rectangle(obstacle.x, obstacle.y, obstacle.width, obstacle.height, {
         isStatic: true,
         angle: obstacle.angle || 0,
-        chamfer: { radius: 8 },
-        restitution: 0.52,
-        friction: 0.04,
+        chamfer: { radius: 5 },
+        restitution: 0.78,
+        friction: 0,
         frictionStatic: 0,
       })
       : Bodies.circle(obstacle.x, obstacle.y, obstacle.radius, {
         isStatic: true,
-        restitution: obstacle.type === "bumper" ? 0.88 : 0.38,
-        friction: obstacle.type === "bumper" ? 0.02 : 0.04,
+        restitution: 0.82,
+        friction: 0,
         frictionStatic: 0,
       });
     const view = createObstacleView(obstacle);
@@ -1374,7 +1431,8 @@ async function startLevel(level) {
   gameStarted = false;
   currentLevel = level;
   currentLevelTargetSpriteId = null;
-  levelTimeLeftMs = level.duration * 1000;
+  levelTimeLeftMs = Number.isFinite(level.duration) ? level.duration * 1000 : Infinity;
+  levelEndReason = "";
   levelStats = { targetClears: 0, clears: 0, maxCombo: 0 };
   spawnTimer = 0;
   clearBalls();
@@ -1533,6 +1591,10 @@ function updateGoalText() {
   if (goals.clears) {
     parts.push(`消除 ${levelStats.clears}/${goals.clears}`);
   }
+  if (currentLevel.infinite) {
+    parts.push(`分数 ${score}`);
+    parts.push(`仓位 ${balls.length}/${MAX_BALLS}`);
+  }
   goalText.text = parts.join("   ");
 }
 
@@ -1609,7 +1671,7 @@ function showLevelSelect() {
 
   LEVELS.forEach((level, index) => {
     const y = 184 + index * 122;
-    const locked = level.id > unlockedLevel;
+    const locked = !level.infinite && level.id > unlockedLevel;
     const card = new PIXI.Graphics();
     card.beginFill(locked ? 0x17202a : level.background.top, locked ? 0.72 : 0.9);
     card.lineStyle(2, locked ? 0xffffff : level.background.accent, locked ? 0.12 : 0.42);
@@ -1626,7 +1688,8 @@ function showLevelSelect() {
     name.position.set(46, y + 17);
     levelSelectContainer.addChild(name);
 
-    const desc = new PIXI.Text(`${level.duration}秒 | ${describeGoals(level)} | 障碍物 ${level.obstacles.length}个`, {
+    const timeLabel = Number.isFinite(level.duration) ? `${level.duration}秒` : "不限时";
+    const desc = new PIXI.Text(`${timeLabel} | ${describeGoals(level)} | 障碍物 ${level.obstacles.length}个`, {
       fill: locked ? 0x77838f : 0xe8fbff,
       fontFamily: "Arial, Microsoft YaHei, sans-serif",
       fontSize: 13,
@@ -1665,6 +1728,8 @@ function showResultOverlay(passed) {
   hideResultOverlay();
   resultOverlay = new PIXI.Container();
   resultOverlay.zIndex = 90;
+  const isFullEnd = levelEndReason === "full";
+  const titleText = isFullEnd ? "容器已满" : (passed ? "通关成功" : "挑战失败");
 
   const shade = new PIXI.Graphics();
   shade.beginFill(0x061018, 0.82);
@@ -1679,7 +1744,7 @@ function showResultOverlay(passed) {
   panel.endFill();
   resultOverlay.addChild(panel);
 
-  const title = new PIXI.Text(passed ? "通关成功" : "挑战失败", {
+  const title = new PIXI.Text(titleText, {
     fill: passed ? 0xfff176 : 0xffffff,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
     fontSize: 32,
@@ -1689,7 +1754,10 @@ function showResultOverlay(passed) {
   title.position.set(DESIGN_WIDTH / 2, 278);
   resultOverlay.addChild(title);
 
-  const detail = new PIXI.Text(`得分 ${score}   ${currentLevel ? describeGoals(currentLevel) : ""}\n${goalText?.text || ""}`, {
+  const detailText = isFullEnd
+    ? `最终得分 ${score}   已装满 ${balls.length}/${MAX_BALLS}\n分数 ${score}   仓位 ${balls.length}/${MAX_BALLS}`
+    : `得分 ${score}   ${currentLevel ? describeGoals(currentLevel) : ""}\n${goalText?.text || ""}`;
+  const detail = new PIXI.Text(detailText, {
     fill: 0xdff7ff,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
     fontSize: 15,
@@ -1733,6 +1801,19 @@ function finishLevel(passed) {
   showResultOverlay(passed);
 }
 
+function finishFullLevel() {
+  if (!gameStarted) {
+    return;
+  }
+
+  levelEndReason = "full";
+  updateGoalText();
+  if (currentLevel?.infinite && goalText) {
+    goalText.text = `分数 ${score}   仓位 ${balls.length}/${MAX_BALLS}`;
+  }
+  finishLevel(false);
+}
+
 function startPhysics() {
   engine = Engine.create({
     gravity: { x: 0, y: 1.12, scale: 0.001 },
@@ -1754,12 +1835,14 @@ function startTicker() {
     lastTimestamp = now;
 
     if (gameStarted) {
-      levelTimeLeftMs -= delta;
+      if (Number.isFinite(levelTimeLeftMs)) {
+        levelTimeLeftMs -= delta;
+      }
       if (timeText) {
         timeText.text = formatTime(levelTimeLeftMs);
       }
 
-      if (levelTimeLeftMs <= 0) {
+      if (Number.isFinite(levelTimeLeftMs) && levelTimeLeftMs <= 0) {
         finishLevel(isLevelComplete());
       }
 
