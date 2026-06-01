@@ -340,6 +340,7 @@ function vibrate(pattern) {
 
 function triggerHaptic(pattern = 18) {
   vibrate(pattern);
+  triggerNativeHapticBridge(pattern);
 
   const haptics = window.Capacitor?.Plugins?.Haptics;
   if (haptics?.vibrate) {
@@ -353,6 +354,27 @@ function triggerHaptic(pattern = 18) {
 
   const duration = Array.isArray(pattern) ? Math.max(...pattern) : pattern;
   triggerVisualShake(duration >= 40 ? 16 : 10, duration >= 40 ? 12 : 7);
+}
+
+function triggerNativeHapticBridge(pattern) {
+  const duration = Array.isArray(pattern) ? Math.max(...pattern) : pattern;
+  const payload = { pattern, duration };
+  const messageHandlers = window.webkit?.messageHandlers;
+
+  for (const name of ["haptics", "haptic", "hapticFeedback"]) {
+    const handler = messageHandlers?.[name];
+    if (handler?.postMessage) {
+      try {
+        handler.postMessage(payload);
+      } catch (_) {}
+    }
+  }
+
+  if (window.nativeHaptics?.impact) {
+    try {
+      window.nativeHaptics.impact(payload);
+    } catch (_) {}
+  }
 }
 
 function triggerVisualShake(frames, strength) {
@@ -390,12 +412,23 @@ async function ensureAudioContext() {
     return null;
   }
 
-  if (!audioContext) {
-    audioContext = new AudioContextClass();
-  }
+  ensureAudioContextSync();
 
   if (audioContext.state === "suspended") {
     await audioContext.resume();
+  }
+
+  return audioContext;
+}
+
+function ensureAudioContextSync() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return null;
+  }
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
   }
 
   return audioContext;
@@ -505,9 +538,33 @@ function unlockHtmlAudio(sound) {
 }
 
 function activateMobileSession() {
-  unlockAudio().catch(() => {});
+  primeAudioFromGesture();
   requestWakeLock();
   playKeepAwakeVideo();
+}
+
+function primeAudioFromGesture() {
+  const context = ensureAudioContextSync();
+  if (!context) {
+    unlockHtmlAudio(selectSound);
+    unlockHtmlAudio(popSound);
+    return;
+  }
+
+  const afterResume = () => {
+    primeSyntheticAudio();
+    loadSoundBuffers().catch(() => {});
+    audioUnlocked = true;
+  };
+
+  if (context.state === "suspended") {
+    context.resume().then(afterResume).catch(() => {
+      audioUnlocked = false;
+    });
+    return;
+  }
+
+  afterResume();
 }
 
 function getPointerPosition(event) {
@@ -775,20 +832,28 @@ function playHtmlSound(sound) {
 }
 
 function playSyntheticPop(volume = 0.18, frequency = 420, duration = 0.055) {
-  if (!audioContext) {
+  const context = ensureAudioContextSync();
+  if (!context) {
     return false;
   }
 
-  const now = audioContext.currentTime;
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
+  if (context.state === "suspended") {
+    context.resume().then(() => {
+      playSyntheticPop(volume, frequency, duration);
+    }).catch(() => {});
+    return true;
+  }
+
+  const now = context.currentTime;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
   oscillator.type = "triangle";
   oscillator.frequency.setValueAtTime(frequency, now);
   oscillator.frequency.exponentialRampToValueAtTime(Math.max(80, frequency * 0.35), now + duration);
   gain.gain.setValueAtTime(volume, now);
   gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
   oscillator.connect(gain);
-  gain.connect(audioContext.destination);
+  gain.connect(context.destination);
   oscillator.start(now);
   oscillator.stop(now + duration);
   return true;
@@ -912,6 +977,19 @@ function setupInput() {
   app.stage.on("pointerup", handlePointerUp);
   app.stage.on("pointerupoutside", handlePointerUp);
   app.stage.on("pointercancel", handlePointerUp);
+  setupAudioUnlockEvents();
+}
+
+function setupAudioUnlockEvents() {
+  const unlock = () => {
+    primeAudioFromGesture();
+    playSyntheticPop(0.05, 260, 0.025);
+  };
+  const options = { capture: true, passive: true };
+
+  window.addEventListener("touchstart", unlock, options);
+  window.addEventListener("pointerdown", unlock, options);
+  window.addEventListener("mousedown", unlock, options);
 }
 
 function setupAudio() {
