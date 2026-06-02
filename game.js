@@ -18,7 +18,7 @@ const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const SHORT_CLEAR_SOUND_PATH = "pop_bomb.wav?v=32";
 const LONG_CLEAR_SOUND_PATH = "pop_big.wav?v=1";
-const COLLECTION_ASSET_MAP_PATH = "collection-assets.json?v=1";
+const COLLECTION_ASSET_MAP_PATH = "collection-assets.json?v=3";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 118;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
@@ -383,6 +383,7 @@ let collectionRenderToken = 0;
 let collectionDetailLayer = null;
 let collectionAssetMap = null;
 let collectionAssetMapPromise = null;
+let imageAvailabilityCache = new Map();
 let gachaResultLayer = null;
 let gachaAnimating = false;
 let lastCoinsEarned = 0;
@@ -832,6 +833,26 @@ function loadImage(src) {
   });
 }
 
+function checkImageAvailable(src) {
+  if (!src) {
+    return Promise.resolve(false);
+  }
+  if (!imageAvailabilityCache.has(src)) {
+    imageAvailabilityCache.set(src, loadImage(src).then(() => true).catch(() => false));
+  }
+  return imageAvailabilityCache.get(src);
+}
+
+async function resolveFirstAvailableImage(sources) {
+  const uniqueSources = [...new Set(sources.filter(Boolean))];
+  for (const src of uniqueSources) {
+    if (await checkImageAvailable(src)) {
+      return src;
+    }
+  }
+  return null;
+}
+
 function ensureCollectionStyles() {
   if (document.getElementById("collection-styles")) {
     return;
@@ -1065,6 +1086,19 @@ function ensureCollectionStyles() {
       height: 94%;
       object-fit: contain;
     }
+    .collection-asset-missing {
+      width: 100%;
+      min-height: 92px;
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      box-sizing: border-box;
+      color: rgba(255, 255, 255, 0.76);
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
     .collection-closeups {
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 6px;
@@ -1137,6 +1171,9 @@ function ensureCollectionStyles() {
       height: 190px;
       object-fit: contain;
       animation: gachaPulse 0.42s ease-in-out infinite alternate;
+    }
+    .gacha-chest.loading {
+      visibility: hidden;
     }
     .gacha-chest-shell {
       position: relative;
@@ -3112,6 +3149,17 @@ function createDetailImage(src, alt) {
   return image;
 }
 
+function createMissingAssetNote(text) {
+  const note = document.createElement("div");
+  note.className = "collection-asset-missing";
+  note.textContent = text;
+  return note;
+}
+
+function getConfirmedCollectionDetail(detail) {
+  return detail?.confirmed === true ? detail : null;
+}
+
 function renderCollectionGrid() {
   if (!collectionGrid) {
     return;
@@ -3224,29 +3272,60 @@ function showCollectionDetail(id) {
   card.append(head, body, caption);
   collectionDetailLayer.appendChild(card);
 
-  loadCollectionAssetMap().then((assetMap) => {
+  loadCollectionAssetMap().then(async (assetMap) => {
     if (!collectionDetailLayer || !collectionOverlay) {
       return;
     }
 
-    const detail = assetMap.get(id);
-    const originalSrc = detail?.sprite ? `sszdy_assets/${detail.sprite}` : `assets/${id}.png`;
-    const textureSrc = detail?.texture ? `sszdy_assets/${detail.texture}` : `assets/${id}.png`;
-    const closeupSources = [...new Set([originalSrc, textureSrc, `assets/${id}.png`])].slice(0, 3);
+    const detail = getConfirmedCollectionDetail(assetMap.get(id));
+    const avatarSrc = `assets/${id}.png`;
+    const originalSrc = await resolveFirstAvailableImage([
+      detail?.sprite ? `sszdy_assets/${detail.sprite}` : "",
+      avatarSrc,
+    ]);
+    const textureSrc = await resolveFirstAvailableImage([
+      detail?.texture ? `sszdy_assets/${detail.texture}` : "",
+      detail?.sprite ? `sszdy_assets/${detail.sprite}` : "",
+      avatarSrc,
+    ]);
+    const closeupSources = [];
+    for (const src of [
+      detail?.sprite ? `sszdy_assets/${detail.sprite}` : "",
+      detail?.texture ? `sszdy_assets/${detail.texture}` : "",
+      avatarSrc,
+    ]) {
+      if (src && !closeupSources.includes(src) && await checkImageAvailable(src)) {
+        closeupSources.push(src);
+      }
+    }
 
     original.textContent = "";
-    original.appendChild(createDetailImage(originalSrc, `No.${id} 图鉴原图`));
+    if (originalSrc) {
+      original.appendChild(createDetailImage(originalSrc, `No.${id} 图鉴原图`));
+    } else {
+      original.appendChild(createMissingAssetNote(`No.${id} 暂无可用图鉴资源`));
+    }
 
     closeups.textContent = "";
-    closeupSources.forEach((src, index) => {
-      closeups.appendChild(createDetailImage(src, `No.${id} 特写 ${index + 1}`));
-    });
+    if (closeupSources.length) {
+      closeupSources.slice(0, 3).forEach((src, index) => {
+        closeups.appendChild(createDetailImage(src, `No.${id} 特写 ${index + 1}`));
+      });
+    } else {
+      closeups.appendChild(createMissingAssetNote(`No.${id} 暂无特写资源`));
+    }
 
     rotator.textContent = "";
-    rotator.appendChild(createDetailImage(textureSrc, `No.${id} 360°旋转展示`));
-    caption.textContent = detail
+    if (textureSrc) {
+      rotator.appendChild(createDetailImage(textureSrc, `No.${id} 360°旋转展示`));
+    } else {
+      rotator.appendChild(createMissingAssetNote(`No.${id} 暂无旋转展示资源`));
+    }
+    const missingOriginal = detail?.sprite && originalSrc === avatarSrc;
+    const missingTexture = detail?.texture && textureSrc === avatarSrc;
+    caption.textContent = detail && !missingOriginal && !missingTexture
       ? `${detail.sprite} / ${detail.texture}`
-      : "该编号暂无原图资源映射，暂用头像展示";
+      : "暂无已确认特写资源，当前显示该松松自己的头像";
   });
 }
 
@@ -3365,6 +3444,15 @@ function delay(ms) {
   });
 }
 
+function createGachaChestShell() {
+  const shell = document.createElement("div");
+  shell.className = "gacha-chest-shell";
+  const lock = document.createElement("div");
+  lock.className = "gacha-chest-lock";
+  shell.appendChild(lock);
+  return shell;
+}
+
 async function runSingleGacha() {
   if (gachaAnimating) {
     return;
@@ -3401,16 +3489,8 @@ async function playGachaAnimation(resultId, isNew) {
   const inner = document.createElement("div");
   inner.className = "gacha-stage-inner";
   const chest = document.createElement("img");
-  chest.className = "gacha-chest";
+  chest.className = "gacha-chest loading";
   chest.alt = "抽卡宝箱";
-  chest.onerror = () => {
-    const shell = document.createElement("div");
-    shell.className = "gacha-chest-shell";
-    const lock = document.createElement("div");
-    lock.className = "gacha-chest-lock";
-    shell.appendChild(lock);
-    chest.replaceWith(shell);
-  };
   const message = document.createElement("div");
   message.className = "gacha-result-text";
   message.textContent = "宝箱开启中...";
@@ -3418,9 +3498,31 @@ async function playGachaAnimation(resultId, isNew) {
   gachaResultLayer.appendChild(inner);
   collectionOverlay.appendChild(gachaResultLayer);
 
-  for (let i = 0; i < GACHA_CHEST_FRAMES.length; i += 1) {
-    chest.src = `sszdy_assets/Sprite_Sprite_${GACHA_CHEST_FRAMES[i]}.png`;
-    await delay(42);
+  const frameSources = [];
+  for (const frame of GACHA_CHEST_FRAMES) {
+    const src = `sszdy_assets/Sprite_Sprite_${frame}.png`;
+    if (await checkImageAvailable(src)) {
+      frameSources.push(src);
+    }
+  }
+
+  if (frameSources.length) {
+    chest.classList.remove("loading");
+    const frameSequence = [
+      ...frameSources,
+      ...frameSources.slice(0, -1).reverse(),
+      ...frameSources,
+    ];
+    for (const src of frameSequence) {
+      if (!gachaResultLayer) {
+        return;
+      }
+      chest.src = src;
+      await delay(46);
+    }
+  } else {
+    chest.replaceWith(createGachaChestShell());
+    await delay(1150);
   }
 
   await loadImage(`assets/${resultId}.png`).catch(() => {});

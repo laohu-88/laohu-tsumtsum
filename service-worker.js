@@ -1,10 +1,11 @@
-﻿const CACHE_NAME = "laohu-tsumtsum-v39";
+const CACHE_NAME = "laohu-tsumtsum-v41";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./game.js",
-  "./game.js?v=39",
+  "./game.js?v=41",
   "./manifest.json",
+  "./manifest.json?v=41",
   "./vendor/pixi.min.js",
   "./vendor/matter.min.js",
   "./connect.wav",
@@ -14,8 +15,11 @@ const CORE_ASSETS = [
   "./pop_bomb.wav",
   "./pop_big.wav",
   "./collection-assets.json",
+  "./collection-assets.json?v=3",
   "./icons/icon-192.png",
+  "./icons/icon-192.png?v=41",
   "./icons/icon-512.png",
+  "./icons/icon-512.png?v=41",
 ];
 
 self.addEventListener("install", (event) => {
