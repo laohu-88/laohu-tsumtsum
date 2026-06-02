@@ -1,9 +1,9 @@
-const CACHE_NAME = "laohu-tsumtsum-v35";
+﻿const CACHE_NAME = "laohu-tsumtsum-v39";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./game.js",
-  "./game.js?v=35",
+  "./game.js?v=39",
   "./manifest.json",
   "./vendor/pixi.min.js",
   "./vendor/matter.min.js",
@@ -12,6 +12,8 @@ const CORE_ASSETS = [
   "./link.wav",
   "./pop.wav",
   "./pop_bomb.wav",
+  "./pop_big.wav",
+  "./collection-assets.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
 ];

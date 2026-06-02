@@ -1,4 +1,4 @@
-const TOTAL_SPRITES = 422;
+﻿const TOTAL_SPRITES = 422;
 
 const FIRST_SPRITE_ID = 1;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
@@ -16,6 +16,9 @@ const MAX_BALLS = 176;
 const WALL_THICKNESS = 34;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
+const SHORT_CLEAR_SOUND_PATH = "pop_bomb.wav?v=32";
+const LONG_CLEAR_SOUND_PATH = "pop_big.wav?v=1";
+const COLLECTION_ASSET_MAP_PATH = "collection-assets.json?v=1";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 118;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
@@ -38,10 +41,10 @@ const HEROES = [
   { id: "dumbo", name: "小飞象", assetId: 142, skillName: "横扫飞行", skill: "horizontal", description: "滑动选择一行，清除横线上的松松" },
   { id: "elsa", name: "艾莎", assetId: 246, skillName: "冰晶震波", skill: "shock", description: "全屏震动并清除少量松松" },
   { id: "stitch", name: "史迪奇", assetId: 179, skillName: "蓝色同伴", skill: "convert", description: "把部分松松变成当前英雄" },
-  { id: "minnie", name: "米妮", assetId: 288, skillName: "甜心横线", skill: "horizontal", description: "滑动选择一行，释放横向清除" },
-  { id: "donald", name: "唐老鸭", assetId: 289, skillName: "暴跳震波", skill: "shock", description: "滑动指定中心，震开并清除松松" },
-  { id: "daisy", name: "黛丝", assetId: 290, skillName: "花束转化", skill: "convert", description: "滑动指定区域，把松松变为同伴" },
-  { id: "goofy", name: "高飞", assetId: 291, skillName: "高飞竖线", skill: "vertical", description: "滑动选择一列，释放纵向清除" },
+  { id: "minnie", name: "米妮", assetId: 154, skillName: "甜心横线", skill: "horizontal", description: "滑动选择一行，释放横向清除" },
+  { id: "donald", name: "唐老鸭", assetId: 286, skillName: "暴跳震波", skill: "shock", description: "滑动指定中心，震开并清除松松" },
+  { id: "daisy", name: "黛丝", assetId: 174, skillName: "花束转化", skill: "convert", description: "滑动指定区域，把松松变为同伴" },
+  { id: "goofy", name: "高飞", assetId: 120, skillName: "高飞竖线", skill: "vertical", description: "滑动选择一列，释放纵向清除" },
 ];
 
 const BOSS_POOL = [
@@ -326,6 +329,7 @@ let timeText;
 let goalText;
 let levelText;
 let popSound;
+let popBigSound;
 let linkSound;
 let selectedBalls = [];
 let selectedBodyIds = new Set();
@@ -341,6 +345,7 @@ let audioUnlocked = false;
 let wakeLock = null;
 let audioContext = null;
 let popBuffer = null;
+let popBigBuffer = null;
 let linkBuffer = null;
 let keepAwakeVideo = null;
 let keepAwakeCanvas = null;
@@ -376,6 +381,8 @@ let collectionCoinText = null;
 let collectionFilter = "all";
 let collectionRenderToken = 0;
 let collectionDetailLayer = null;
+let collectionAssetMap = null;
+let collectionAssetMapPromise = null;
 let gachaResultLayer = null;
 let gachaAnimating = false;
 let lastCoinsEarned = 0;
@@ -845,7 +852,7 @@ function ensureCollectionStyles() {
       touch-action: none;
     }
     .collection-panel {
-      width: min(420px, 100%);
+      width: min(860px, 100%);
       max-height: min(888px, 100%);
       display: flex;
       flex-direction: column;
@@ -943,6 +950,13 @@ function ensureCollectionStyles() {
       padding: 14px 14px 18px;
       -webkit-overflow-scrolling: touch;
     }
+    .collection-content {
+      min-height: 0;
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+      overflow: hidden;
+    }
     .collection-card {
       min-width: 0;
       aspect-ratio: 1;
@@ -989,16 +1003,17 @@ function ensureCollectionStyles() {
       font-weight: 800;
     }
     .collection-detail {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      padding: 16px;
+      min-height: 0;
+      display: flex;
+      padding: 14px 14px 18px 0;
       box-sizing: border-box;
-      background: rgba(3, 8, 13, 0.82);
+      background: rgba(5, 14, 22, 0.22);
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .collection-detail-card {
-      width: min(340px, 92vw);
+      width: 100%;
+      align-self: flex-start;
       display: grid;
       gap: 12px;
       border: 2px solid rgba(255, 241, 118, 0.76);
@@ -1029,44 +1044,52 @@ function ensureCollectionStyles() {
     }
     .collection-detail-body {
       display: grid;
-      grid-template-columns: 112px 1fr;
+      grid-template-columns: 1fr;
       gap: 12px;
-      align-items: center;
+      align-items: stretch;
     }
-    .collection-sticker,
-    .collection-closeup {
+    .collection-original,
+    .collection-closeups,
+    .collection-rotator {
       position: relative;
       display: grid;
       place-items: center;
-      min-height: 120px;
+      min-height: 142px;
       border: 1px solid rgba(255, 255, 255, 0.16);
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.08);
       overflow: hidden;
     }
-    .collection-sticker img {
-      width: 92%;
-      height: 92%;
+    .collection-original img {
+      width: 94%;
+      height: 94%;
       object-fit: contain;
     }
-    .collection-closeup img {
-      position: absolute;
-      width: 150%;
-      height: 150%;
+    .collection-closeups {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      padding: 8px;
+      min-height: 94px;
+      box-sizing: border-box;
+    }
+    .collection-closeups img {
+      width: 100%;
+      height: 78px;
       object-fit: contain;
-      image-rendering: auto;
-      animation: collectionRotate 3.6s linear infinite;
+      background: rgba(0, 0, 0, 0.18);
+      border-radius: 6px;
+    }
+    .collection-rotator {
+      min-height: 170px;
+      perspective: 780px;
+    }
+    .collection-rotator img {
+      width: 86%;
+      height: 86%;
+      object-fit: contain;
+      animation: collectionRotate 4s linear infinite;
       transform-origin: center;
-    }
-    .collection-closeup img:nth-child(2) {
-      animation-delay: -1.2s;
-      transform: rotateY(120deg);
-      opacity: 0.72;
-    }
-    .collection-closeup img:nth-child(3) {
-      animation-delay: -2.4s;
-      transform: rotateY(240deg);
-      opacity: 0.72;
+      filter: drop-shadow(0 16px 18px rgba(0, 0, 0, 0.38));
     }
     .collection-detail-caption {
       color: #ffeaa0;
@@ -1075,11 +1098,22 @@ function ensureCollectionStyles() {
       text-align: center;
     }
     @media (max-width: 360px) {
-      .collection-detail-body {
-        grid-template-columns: 1fr;
-      }
       .collection-grid {
         grid-auto-rows: 62px;
+      }
+    }
+    @media (max-width: 720px) {
+      .collection-panel {
+        width: min(420px, 100%);
+      }
+      .collection-content {
+        grid-template-columns: 1fr;
+      }
+      .collection-detail {
+        padding: 0 14px 18px;
+      }
+      .collection-grid {
+        max-height: 330px;
       }
     }
     .gacha-stage {
@@ -1426,8 +1460,11 @@ async function loadSoundBuffers() {
     linkBuffer ? Promise.resolve() : loadAudioBuffer(CONNECT_SOUND_PATH).then((buffer) => {
       linkBuffer = buffer;
     }),
-    popBuffer ? Promise.resolve() : loadAudioBuffer("pop_bomb.wav").then((buffer) => {
+    popBuffer ? Promise.resolve() : loadAudioBuffer(SHORT_CLEAR_SOUND_PATH).then((buffer) => {
       popBuffer = buffer;
+    }),
+    popBigBuffer ? Promise.resolve() : loadAudioBuffer(LONG_CLEAR_SOUND_PATH).then((buffer) => {
+      popBigBuffer = buffer;
     }),
   ]);
 }
@@ -1504,6 +1541,7 @@ async function unlockAudio() {
 
   unlockHtmlAudio(linkSound);
   unlockHtmlAudio(popSound);
+  unlockHtmlAudio(popBigSound);
 }
 
 function primeSyntheticAudio() {
@@ -1546,6 +1584,7 @@ function primeAudioFromGesture() {
   if (!context) {
     unlockHtmlAudio(linkSound);
     unlockHtmlAudio(popSound);
+    unlockHtmlAudio(popBigSound);
     return;
   }
 
@@ -1948,7 +1987,7 @@ function handlePointerUp() {
   lastPointerPosition = null;
 
   if (selectedBalls.length >= 2) {
-    playPopSound();
+    playPopSound(selectedBalls.length);
     explodeSelectedBalls();
   } else {
     dragPointerPosition = null;
@@ -2013,9 +2052,14 @@ function playSelectSound() {
   playSoundBuffer(linkBuffer, 0.32) || playHtmlSound(linkSound);
 }
 
-function playPopSound() {
-  playSyntheticPop(0.34, 330, 0.11);
-  setTimeout(() => playSyntheticPop(0.2, 180, 0.09), 38);
+function playPopSound(chainLength) {
+  const longClear = chainLength >= 5;
+  playSyntheticPop(longClear ? 0.42 : 0.34, longClear ? 390 : 330, longClear ? 0.13 : 0.11);
+  setTimeout(() => playSyntheticPop(longClear ? 0.26 : 0.2, longClear ? 210 : 180, 0.09), 38);
+  if (longClear) {
+    playSoundBuffer(popBigBuffer, 0.9) || playHtmlSound(popBigSound) || playSoundBuffer(popBuffer, 0.95) || playHtmlSound(popSound);
+    return;
+  }
   playSoundBuffer(popBuffer, 0.95) || playHtmlSound(popSound);
 }
 
@@ -2175,7 +2219,7 @@ function animateSkillRing(x, y, color = 0x73f7cf) {
 function spendHeroSkillEnergy() {
   heroEnergy = 0;
   triggerHaptic([60, 35, 100]);
-  playPopSound();
+  playPopSound(5);
 }
 
 function executeTargetedHeroSkill(point) {
@@ -2318,10 +2362,16 @@ function setupAudio() {
   linkSound.volume = 0.32;
   linkSound.load();
 
-  popSound = new Audio("pop_bomb.wav");
+  popSound = new Audio(SHORT_CLEAR_SOUND_PATH);
   popSound.preload = "auto";
   popSound.volume = 0.9;
   popSound.load();
+
+  popBigSound = new Audio(LONG_CLEAR_SOUND_PATH);
+  popBigSound.preload = "auto";
+  popBigSound.volume = 0.9;
+  popBigSound.load();
+
   loadSoundBuffers().catch(() => {});
 }
 
@@ -3032,6 +3082,36 @@ function setCollectionFilter(filter) {
   renderCollectionGrid();
 }
 
+function loadCollectionAssetMap() {
+  if (collectionAssetMap) {
+    return Promise.resolve(collectionAssetMap);
+  }
+
+  if (!collectionAssetMapPromise) {
+    collectionAssetMapPromise = fetch(COLLECTION_ASSET_MAP_PATH, { cache: "force-cache" })
+      .then((response) => response.json())
+      .then((data) => {
+        collectionAssetMap = new Map(data.items.map((item) => [item.id, item]));
+        return collectionAssetMap;
+      })
+      .catch(() => {
+        collectionAssetMap = new Map();
+        return collectionAssetMap;
+      });
+  }
+
+  return collectionAssetMapPromise;
+}
+
+function createDetailImage(src, alt) {
+  const image = document.createElement("img");
+  image.src = src;
+  image.alt = alt;
+  image.loading = "lazy";
+  image.decoding = "async";
+  return image;
+}
+
 function renderCollectionGrid() {
   if (!collectionGrid) {
     return;
@@ -3104,16 +3184,11 @@ function showCollectionDetail(id) {
     return;
   }
 
-  hideCollectionDetail();
+  if (!collectionDetailLayer) {
+    return;
+  }
 
-  collectionDetailLayer = document.createElement("div");
-  collectionDetailLayer.className = "collection-detail";
-  collectionDetailLayer.addEventListener("click", (event) => {
-    if (event.target === collectionDetailLayer) {
-      hideCollectionDetail();
-    }
-  });
-
+  collectionDetailLayer.textContent = "";
   const card = document.createElement("section");
   card.className = "collection-detail-card";
   card.setAttribute("aria-label", `No.${id} 详情`);
@@ -3131,36 +3206,57 @@ function showCollectionDetail(id) {
 
   const body = document.createElement("div");
   body.className = "collection-detail-body";
-  const sticker = document.createElement("div");
-  sticker.className = "collection-sticker";
-  const stickerImage = document.createElement("img");
-  stickerImage.src = `assets/${id}.png`;
-  stickerImage.alt = `No.${id} 贴纸`;
-  sticker.appendChild(stickerImage);
+  const original = document.createElement("div");
+  original.className = "collection-original";
+  original.textContent = "加载图鉴原图...";
 
-  const closeup = document.createElement("div");
-  closeup.className = "collection-closeup";
-  for (const label of ["正面", "侧面", "背面"]) {
-    const closeupImage = document.createElement("img");
-    closeupImage.src = `assets/${id}.png`;
-    closeupImage.alt = `No.${id} ${label}特写`;
-    closeup.appendChild(closeupImage);
-  }
-  body.append(sticker, closeup);
+  const closeups = document.createElement("div");
+  closeups.className = "collection-closeups";
+
+  const rotator = document.createElement("div");
+  rotator.className = "collection-rotator";
+  body.append(original, closeups, rotator);
 
   const caption = document.createElement("div");
   caption.className = "collection-detail-caption";
-  caption.textContent = "原图贴纸 / 多视角特写包 / 360°旋转展示";
+  caption.textContent = "图鉴原图 / 多视角特写包 / 360°旋转展示";
 
   card.append(head, body, caption);
   collectionDetailLayer.appendChild(card);
-  collectionOverlay.appendChild(collectionDetailLayer);
+
+  loadCollectionAssetMap().then((assetMap) => {
+    if (!collectionDetailLayer || !collectionOverlay) {
+      return;
+    }
+
+    const detail = assetMap.get(id);
+    const originalSrc = detail?.sprite ? `sszdy_assets/${detail.sprite}` : `assets/${id}.png`;
+    const textureSrc = detail?.texture ? `sszdy_assets/${detail.texture}` : `assets/${id}.png`;
+    const closeupSources = [...new Set([originalSrc, textureSrc, `assets/${id}.png`])].slice(0, 3);
+
+    original.textContent = "";
+    original.appendChild(createDetailImage(originalSrc, `No.${id} 图鉴原图`));
+
+    closeups.textContent = "";
+    closeupSources.forEach((src, index) => {
+      closeups.appendChild(createDetailImage(src, `No.${id} 特写 ${index + 1}`));
+    });
+
+    rotator.textContent = "";
+    rotator.appendChild(createDetailImage(textureSrc, `No.${id} 360°旋转展示`));
+    caption.textContent = detail
+      ? `${detail.sprite} / ${detail.texture}`
+      : "该编号暂无原图资源映射，暂用头像展示";
+  });
 }
 
 function hideCollectionDetail() {
   if (collectionDetailLayer) {
-    collectionDetailLayer.remove();
-    collectionDetailLayer = null;
+    collectionDetailLayer.textContent = "";
+    const empty = document.createElement("div");
+    empty.className = "collection-empty";
+    empty.textContent = "选择已解锁松松查看图鉴原图";
+    collectionDetailLayer.appendChild(empty);
   }
 }
 
@@ -3232,7 +3328,15 @@ function showCollectionBook() {
   collectionGrid = document.createElement("div");
   collectionGrid.className = "collection-grid";
 
-  panel.append(head, actions, collectionGrid);
+  collectionDetailLayer = document.createElement("div");
+  collectionDetailLayer.className = "collection-detail";
+  hideCollectionDetail();
+
+  const content = document.createElement("div");
+  content.className = "collection-content";
+  content.append(collectionGrid, collectionDetailLayer);
+
+  panel.append(head, actions, content);
   collectionOverlay.appendChild(panel);
   document.body.appendChild(collectionOverlay);
   updateCoinsUi();
