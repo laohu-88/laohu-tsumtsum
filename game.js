@@ -44,10 +44,10 @@ const LEVELS = [
   {
     id: 1,
     name: "第一关",
-    subtitle: "红色松松训练",
+    subtitle: "目标松松训练",
     duration: 60,
     goals: { score: 500, targetClears: 10 },
-    targetLabel: "红色",
+    targetLabel: "目标",
     targetWeight: 0.3,
     background: { top: 0x1e9d8f, bottom: 0x143247, accent: 0xffd66e, glow: 0x8ff4ff },
     obstacles: [],
@@ -69,10 +69,10 @@ const LEVELS = [
   {
     id: 3,
     name: "第三关",
-    subtitle: "红色收集线",
+    subtitle: "目标收集线",
     duration: 70,
     goals: { score: 1300, targetClears: 14 },
-    targetLabel: "红色",
+    targetLabel: "目标",
     targetWeight: 0.34,
     background: { top: 0x5e3f9d, bottom: 0x1f1631, accent: 0xf8bd5b, glow: 0x9af59a },
     obstacles: [
@@ -105,7 +105,7 @@ const LEVELS = [
     subtitle: "震波派对",
     duration: 75,
     goals: { score: 2800, shockClears: 3, targetClears: 16 },
-    targetLabel: "红色",
+    targetLabel: "目标",
     targetWeight: 0.38,
     background: { top: 0x7a3047, bottom: 0x20121a, accent: 0x73f7cf, glow: 0xffd66e },
     obstacles: [
@@ -428,7 +428,7 @@ function awardCoinsForScore(finalScore) {
 
 function updateCoinsUi() {
   if (coinsText) {
-    coinsText.text = `Coins ${coins}`;
+    coinsText.text = `金币 ${coins}`;
   }
   if (collectionCoinText) {
     collectionCoinText.textContent = `金币 ${coins}`;
@@ -1744,6 +1744,15 @@ function handlePointerDown(event) {
 }
 
 function handlePointerMove(event) {
+  if (!gameStarted) {
+    clearSelection();
+    cancelPendingHeroSkill();
+    isDragging = false;
+    lastPointerPosition = null;
+    dragPointerPosition = null;
+    return;
+  }
+
   if (pendingHeroSkill) {
     const point = getPointerPosition(event);
     pendingSkillPoint = point;
@@ -1765,6 +1774,15 @@ function handlePointerMove(event) {
 }
 
 function handlePointerUp() {
+  if (!gameStarted) {
+    clearSelection();
+    cancelPendingHeroSkill();
+    isDragging = false;
+    lastPointerPosition = null;
+    dragPointerPosition = null;
+    return;
+  }
+
   if (pendingHeroSkill) {
     executeTargetedHeroSkill(pendingSkillPoint);
     return;
@@ -2313,7 +2331,7 @@ function createHud() {
   topBar.zIndex = 20;
   app.stage.addChild(topBar);
 
-  const title = new PIXI.Text("TSUM DROP", {
+  const title = new PIXI.Text("松松掉落", {
     fill: 0xffffff,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
     fontSize: 20,
@@ -2367,7 +2385,7 @@ function createHud() {
   goalText.zIndex = 21;
   app.stage.addChild(goalText);
 
-  const restart = new PIXI.Text("RESTART", {
+  const restart = new PIXI.Text("重开", {
     fill: 0xffffff,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
     fontSize: 14,
@@ -2383,7 +2401,7 @@ function createHud() {
   });
   app.stage.addChild(restart);
 
-  const levels = new PIXI.Text("LEVELS", {
+  const levels = new PIXI.Text("关卡", {
     fill: 0xffffff,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
     fontSize: 14,
@@ -2737,7 +2755,7 @@ function createCollectionCard(id) {
       showCollectionDetail(id);
       return;
     }
-    setCollectionMessage(`No.${id} locked`);
+    setCollectionMessage(`No.${id} 未解锁`);
   });
   return card;
 }
@@ -2759,7 +2777,7 @@ function showCollectionDetail(id) {
 
   const card = document.createElement("section");
   card.className = "collection-detail-card";
-  card.setAttribute("aria-label", `No.${id} detail`);
+  card.setAttribute("aria-label", `No.${id} 详情`);
 
   const head = document.createElement("div");
   head.className = "collection-detail-head";
@@ -2768,7 +2786,7 @@ function showCollectionDetail(id) {
   const close = document.createElement("button");
   close.type = "button";
   close.className = "collection-detail-close";
-  close.textContent = "x";
+  close.textContent = "×";
   close.addEventListener("click", hideCollectionDetail);
   head.append(title, close);
 
@@ -2778,20 +2796,20 @@ function showCollectionDetail(id) {
   sticker.className = "collection-sticker";
   const stickerImage = document.createElement("img");
   stickerImage.src = `assets/${id}.png`;
-  stickerImage.alt = `No.${id} sticker`;
+  stickerImage.alt = `No.${id} 贴纸`;
   sticker.appendChild(stickerImage);
 
   const closeup = document.createElement("div");
   closeup.className = "collection-closeup";
   const closeupImage = document.createElement("img");
   closeupImage.src = `assets/${id}.png`;
-  closeupImage.alt = `No.${id} close-up`;
+  closeupImage.alt = `No.${id} 放大预览`;
   closeup.appendChild(closeupImage);
   body.append(sticker, closeup);
 
   const caption = document.createElement("div");
   caption.className = "collection-detail-caption";
-  caption.textContent = "Sticker / close-up";
+  caption.textContent = "贴纸 / 放大预览";
 
   card.append(head, body, caption);
   collectionDetailLayer.appendChild(card);
@@ -3073,7 +3091,7 @@ function showLevelSelect() {
     desc.position.set(x + 12, y + 32);
     levelSelectContainer.addChild(desc);
 
-    const action = createButton(locked ? "LOCK" : "START", x + 118, y + 18, 56, 36, () => {
+    const action = createButton(locked ? "锁定" : "开始", x + 118, y + 18, 56, 36, () => {
       if (!locked) {
         startLevel(level).catch(showFatalError);
       }
@@ -3225,7 +3243,7 @@ function showResultOverlay(passed) {
   let detailText = isSprint
     ? `得分 ${score}   ${currentLevel.sprintMinutes}分钟最高 ${sprintBest}\n${levelEndReason === "newBest" ? "新纪录" : "继续冲刺可刷新纪录"}`
     : `得分 ${score}   ${currentLevel ? describeGoals(currentLevel) : ""}\n${goalText?.text || ""}`;
-  detailText += `\n本局获得 ${lastCoinsEarned} Coins   当前 ${coins} Coins`;
+  detailText += `\n本局获得 ${lastCoinsEarned} 金币   当前 ${coins} 金币`;
   const detail = new PIXI.Text(detailText, {
     fill: 0xdff7ff,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
@@ -3264,6 +3282,10 @@ function finishLevel(passed) {
 
   gameStarted = false;
   clearSelection();
+  cancelPendingHeroSkill();
+  isDragging = false;
+  lastPointerPosition = null;
+  dragPointerPosition = null;
   lastCoinsEarned = awardCoinsForScore(score);
   if (passed && currentLevel && !currentLevel.infinite) {
     saveProgress(currentLevel.id);
