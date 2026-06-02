@@ -17,7 +17,7 @@ const WALL_THICKNESS = 34;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const HUD_TOP = 54;
-const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 30;
+const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 72;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
 const SPRINT_BEST_STORAGE_KEY = "laohu-tsumtsum-sprint-best-v1";
 const HERO_STORAGE_KEY = "laohu-tsumtsum-hero-v1";
@@ -30,12 +30,14 @@ const GACHA_CHEST_FRAMES = [
   70460, 70461, 70464, 70469, 70472, 70474, 70477, 70479, 70482, 70486, 70490, 70493,
 ];
 const HERO_MAX_ENERGY = 100;
+const LEVELS_PER_PAGE = 10;
+const HERO_PANEL_Y = DESIGN_HEIGHT - 168;
 
 const HEROES = [
-  { id: "mickey", name: "米奇", assetId: 1, skillName: "星光竖线", skill: "vertical", description: "清除中线一列松松" },
-  { id: "dumbo", name: "小飞象", assetId: 2, skillName: "横扫飞行", skill: "horizontal", description: "清除中段横排松松" },
-  { id: "elsa", name: "艾莎", assetId: 3, skillName: "冰晶震波", skill: "shock", description: "全屏物理震动并清除少量松松" },
-  { id: "stitch", name: "史迪奇", assetId: 4, skillName: "蓝色同伴", skill: "convert", description: "把部分松松变成当前英雄" },
+  { id: "mickey", name: "米奇", assetId: 287, skillName: "星光竖线", skill: "vertical", description: "滑动选择一列，清除直线上的松松" },
+  { id: "dumbo", name: "小飞象", assetId: 142, skillName: "横扫飞行", skill: "horizontal", description: "滑动选择一行，清除横线上的松松" },
+  { id: "elsa", name: "艾莎", assetId: 246, skillName: "冰晶震波", skill: "shock", description: "全屏震动并清除少量松松" },
+  { id: "stitch", name: "史迪奇", assetId: 179, skillName: "蓝色同伴", skill: "convert", description: "把部分松松变成当前英雄" },
 ];
 
 const LEVELS = [
@@ -171,6 +173,57 @@ const LEVELS = [
   },
 ];
 
+const EXTRA_LEVEL_THEMES = [
+  { subtitle: "双塔回旋", goals: { score: 2600, clears: 32 }, colors: [0x217a64, 0x101a22, 0xffd66e, 0x7fffd4] },
+  { subtitle: "花瓣漏斗", goals: { score: 3200, targetClears: 18 }, targetWeight: 0.34, colors: [0x2b6f9f, 0x11172a, 0xffd166, 0x9bf6ff] },
+  { subtitle: "彩虹分流", goals: { score: 3600, combo: 7 }, colors: [0x6c4a9b, 0x171126, 0x84f2c2, 0xff9fcb] },
+  { subtitle: "左右护航", goals: { score: 3800, clears: 40 }, colors: [0x22667a, 0x10151f, 0xffb86b, 0x96f7ff] },
+  { subtitle: "目标三角阵", goals: { score: 4200, targetClears: 22 }, targetWeight: 0.36, colors: [0x8f4764, 0x22131b, 0x73f7cf, 0xffd66e] },
+  { subtitle: "短链挑战", goals: { score: 3000, combo: 8 }, colors: [0x315f7f, 0x111820, 0xfbe36d, 0x68e0ff] },
+  { subtitle: "冰桥斜坡", goals: { score: 4600, clears: 44 }, colors: [0x4c7c96, 0x10202d, 0xa7f2ff, 0xffffff] },
+  { subtitle: "反向冰桥", goals: { score: 4800, targetClears: 24 }, targetWeight: 0.36, colors: [0x5c4e9a, 0x15142a, 0xffc76f, 0x9af59a] },
+  { subtitle: "中央旋钮", goals: { score: 5200, shockClears: 4 }, colors: [0x7c5a2a, 0x191511, 0x9bf6ff, 0xffe082] },
+  { subtitle: "星门收集", goals: { score: 5600, targetClears: 28 }, targetWeight: 0.4, colors: [0x264f82, 0x0f1524, 0xfff176, 0x73f7cf] },
+  { subtitle: "窄瓶加速", goals: { score: 5000, clears: 46 }, colors: [0x1f805f, 0x101a19, 0xff9fcb, 0x7fffd4] },
+  { subtitle: "双目标冲刺", goals: { score: 6200, targetClears: 30, combo: 7 }, targetWeight: 0.42, colors: [0x81456f, 0x211427, 0x8ff4ff, 0xffd66e] },
+  { subtitle: "回廊连消", goals: { score: 6800, combo: 9 }, colors: [0x355f93, 0x121726, 0xffc76f, 0xa7f2ff] },
+  { subtitle: "高分终盘", goals: { score: 7600, clears: 58 }, colors: [0x9a4f3b, 0x21140f, 0x73f7cf, 0xfff176] },
+  { subtitle: "松松总动员", goals: { score: 8500, targetClears: 34, shockClears: 5 }, targetWeight: 0.44, colors: [0x2d7a86, 0x101820, 0xffd66e, 0xff9fcb] },
+];
+
+function createExtraLevelObstacles(index) {
+  const patterns = [
+    [{ type: "bar", x: 108, y: 460, width: 90, height: 9, angle: 1.18 }, { type: "bar", x: 322, y: 460, width: 90, height: 9, angle: -1.18 }, { type: "pin", x: 215, y: 610, radius: 13 }, { type: "pin", x: 150, y: 760, radius: 12 }, { type: "pin", x: 280, y: 760, radius: 12 }],
+    [{ type: "bar", x: 122, y: 412, width: 78, height: 9, angle: 0.3 }, { type: "bar", x: 308, y: 412, width: 78, height: 9, angle: -0.3 }, { type: "bar", x: 142, y: 612, width: 76, height: 9, angle: -0.34 }, { type: "bar", x: 288, y: 612, width: 76, height: 9, angle: 0.34 }, { type: "pin", x: 215, y: 724, radius: 14 }],
+    [{ type: "pin", x: 104, y: 390, radius: 12 }, { type: "pin", x: 326, y: 390, radius: 12 }, { type: "bar", x: 154, y: 566, width: 78, height: 9, angle: -0.34 }, { type: "bar", x: 276, y: 566, width: 78, height: 9, angle: 0.34 }, { type: "pin", x: 215, y: 734, radius: 14 }],
+    [{ type: "bar", x: 86, y: 516, width: 118, height: 10, angle: 1.33 }, { type: "bar", x: 344, y: 516, width: 118, height: 10, angle: -1.33 }, { type: "pin", x: 215, y: 455, radius: 12 }, { type: "pin", x: 215, y: 690, radius: 14 }],
+    [{ type: "pin", x: 154, y: 440, radius: 14 }, { type: "pin", x: 276, y: 440, radius: 14 }, { type: "pin", x: 215, y: 560, radius: 16 }, { type: "bar", x: 215, y: 716, width: 112, height: 10, angle: 0 }],
+  ];
+  return patterns[index % patterns.length];
+}
+
+const EXTRA_LEVELS = EXTRA_LEVEL_THEMES.map((theme, index) => {
+  const id = index + 6;
+  const colors = theme.colors;
+  return {
+    id,
+    name: "第" + id + "关",
+    subtitle: theme.subtitle,
+    duration: Math.min(120, 70 + index * 5),
+    goals: theme.goals,
+    targetLabel: theme.goals.targetClears ? "目标" : undefined,
+    targetWeight: theme.targetWeight || 0.2,
+    background: { top: colors[0], bottom: colors[1], accent: colors[2], glow: colors[3] },
+    obstacles: createExtraLevelObstacles(index),
+  };
+});
+
+LEVELS.splice(5, 0, ...EXTRA_LEVELS);
+LEVELS.slice(20).forEach((level, index) => {
+  level.id = 21 + index;
+});
+
+
 const BOTTLE = {
   leftNeckTop: { x: 116, y: 94 },
   rightNeckTop: { x: 314, y: 94 },
@@ -237,6 +290,7 @@ let audioPrimed = false;
 let backgroundLayer;
 let obstacleLayer;
 let levelSelectContainer;
+let levelSelectPage = 0;
 let resultOverlay;
 let levelObstacleBodies = [];
 let levelObstacleViews = [];
@@ -249,6 +303,7 @@ let sprintBestScores = {};
 let selectedHeroId = HEROES[0].id;
 let selectedHero = HEROES[0];
 let selectedHeroTexture = null;
+let heroTextures = new Map();
 let coins = 0;
 let unlockedSprites = new Set();
 let coinsText = null;
@@ -270,6 +325,9 @@ let heroEnergyText = null;
 let heroSkillButton = null;
 let heroSkillLabel = null;
 let heroSkillDesc = null;
+let skillPreviewLine = null;
+let pendingHeroSkill = null;
+let pendingSkillPoint = null;
 let heroEnergy = 0;
 let levelStats = {
   targetClears: 0,
@@ -626,8 +684,14 @@ async function loadRoundTextures() {
 
 async function loadHeroTexture() {
   const path = `assets/${selectedHero.assetId}.png`;
+  if (heroTextures.has(selectedHero.id)) {
+    selectedHeroTexture = heroTextures.get(selectedHero.id);
+    return;
+  }
+
   if (PIXI.Assets && PIXI.Assets.load) {
     selectedHeroTexture = await PIXI.Assets.load(path);
+    heroTextures.set(selectedHero.id, selectedHeroTexture);
     return;
   }
 
@@ -644,6 +708,33 @@ async function loadHeroTexture() {
     });
     loader.onError.add((error) => reject(error));
   });
+  heroTextures.set(selectedHero.id, selectedHeroTexture);
+}
+
+async function loadHeroTextures() {
+  await Promise.all(HEROES.map(async (hero) => {
+    const path = `assets/${hero.assetId}.png`;
+    let texture;
+    if (PIXI.Assets && PIXI.Assets.load) {
+      texture = await PIXI.Assets.load(path);
+    } else {
+      texture = await new Promise((resolve, reject) => {
+        const loader = new PIXI.Loader();
+        loader.add(path, path);
+        loader.load((_, resources) => {
+          const loaded = resources[path]?.texture;
+          if (!loaded) {
+            reject(new Error("Hero asset failed to load."));
+            return;
+          }
+          resolve(loaded);
+        });
+        loader.onError.add((error) => reject(error));
+      });
+    }
+    heroTextures.set(hero.id, texture);
+  }));
+  selectedHeroTexture = heroTextures.get(selectedHero.id) || selectedHeroTexture;
 }
 
 function loadImage(src) {
@@ -1574,6 +1665,14 @@ function redrawConnectionLine() {
   }
 }
 
+function cancelPendingHeroSkill() {
+  pendingHeroSkill = null;
+  pendingSkillPoint = null;
+  if (skillPreviewLine) {
+    skillPreviewLine.clear();
+  }
+}
+
 function clearSelection() {
   for (const ball of selectedBalls) {
     ball.view.scale.set(1);
@@ -1587,15 +1686,47 @@ function clearSelection() {
   lineNodes.clear();
 }
 
+function drawSkillPreview(point) {
+  if (!skillPreviewLine || !pendingHeroSkill || !point) {
+    return;
+  }
+
+  skillPreviewLine.clear();
+  const color = currentLevel?.background?.accent || 0xfff176;
+  skillPreviewLine.lineStyle({ width: 22, color, alpha: 0.32, cap: "round" });
+  if (pendingHeroSkill.skill === "vertical") {
+    skillPreviewLine.moveTo(point.x, 236);
+    skillPreviewLine.lineTo(point.x, BOTTOM_SAFE_Y + 12);
+  } else {
+    skillPreviewLine.moveTo(42, point.y);
+    skillPreviewLine.lineTo(DESIGN_WIDTH - 42, point.y);
+  }
+
+  skillPreviewLine.lineStyle({ width: 6, color: 0xffffff, alpha: 0.92, cap: "round" });
+  if (pendingHeroSkill.skill === "vertical") {
+    skillPreviewLine.moveTo(point.x, 236);
+    skillPreviewLine.lineTo(point.x, BOTTOM_SAFE_Y + 12);
+  } else {
+    skillPreviewLine.moveTo(42, point.y);
+    skillPreviewLine.lineTo(DESIGN_WIDTH - 42, point.y);
+  }
+}
+
 function handlePointerDown(event) {
   if (!gameStarted) {
     return;
   }
 
   activateMobileSession();
+  const point = getPointerPosition(event);
+  if (pendingHeroSkill) {
+    pendingSkillPoint = point;
+    drawSkillPreview(point);
+    return;
+  }
+
   isDragging = true;
   clearSelection();
-  const point = getPointerPosition(event);
   lastPointerPosition = point;
   dragPointerPosition = point;
   const touchedBalls = findTouchedBalls(point, point);
@@ -1613,6 +1744,13 @@ function handlePointerDown(event) {
 }
 
 function handlePointerMove(event) {
+  if (pendingHeroSkill) {
+    const point = getPointerPosition(event);
+    pendingSkillPoint = point;
+    drawSkillPreview(point);
+    return;
+  }
+
   if (!isDragging || !lastPointerPosition) {
     return;
   }
@@ -1627,6 +1765,11 @@ function handlePointerMove(event) {
 }
 
 function handlePointerUp() {
+  if (pendingHeroSkill) {
+    executeTargetedHeroSkill(pendingSkillPoint);
+    return;
+  }
+
   if (!isDragging) {
     return;
   }
@@ -1804,25 +1947,108 @@ function explodeSelectedBalls() {
   }
 }
 
+function startTargetedHeroSkill() {
+  pendingHeroSkill = selectedHero;
+  pendingSkillPoint = null;
+  clearSelection();
+  if (heroEnergyText) {
+    heroEnergyText.text = "在瓶中滑动选择位置";
+  }
+  drawSkillPreview({ x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.58 });
+}
+
+function animateSkillSweep(axis, value, color = 0xfff176) {
+  const sweep = new PIXI.Graphics();
+  sweep.lineStyle({ width: 16, color, alpha: 0.35, cap: "round" });
+  if (axis === "vertical") {
+    sweep.moveTo(value, 226);
+    sweep.lineTo(value, BOTTOM_SAFE_Y + 20);
+    for (let y = 260; y < BOTTOM_SAFE_Y; y += 54) {
+      makeStarParticle(value + (Math.random() - 0.5) * 18, y);
+    }
+  } else {
+    sweep.moveTo(40, value);
+    sweep.lineTo(DESIGN_WIDTH - 40, value);
+    for (let x = 58; x < DESIGN_WIDTH - 40; x += 54) {
+      makeStarParticle(x, value + (Math.random() - 0.5) * 18);
+    }
+  }
+
+  sweep.lineStyle({ width: 6, color: 0xffffff, alpha: 0.9, cap: "round" });
+  if (axis === "vertical") {
+    sweep.moveTo(value, 226);
+    sweep.lineTo(value, BOTTOM_SAFE_Y + 20);
+  } else {
+    sweep.moveTo(40, value);
+    sweep.lineTo(DESIGN_WIDTH - 40, value);
+  }
+  sweep.zIndex = 34;
+  particleLayer.addChild(sweep);
+  particles.push({ view: sweep, vx: 0, vy: 0, spin: 0, life: 24, maxLife: 24 });
+}
+
+function animateSkillRing(x, y, color = 0x73f7cf) {
+  const ring = new PIXI.Graphics();
+  ring.lineStyle(10, color, 0.9);
+  ring.drawCircle(0, 0, 42);
+  ring.position.set(x, y);
+  ring.zIndex = 34;
+  particleLayer.addChild(ring);
+  particles.push({ view: ring, vx: 0, vy: 0, spin: 0, life: 32, maxLife: 32 });
+}
+
+function spendHeroSkillEnergy() {
+  heroEnergy = 0;
+  triggerHaptic([60, 35, 100]);
+  playPopSound();
+}
+
+function executeTargetedHeroSkill(point) {
+  if (!pendingHeroSkill || heroEnergy < HERO_MAX_ENERGY) {
+    cancelPendingHeroSkill();
+    return;
+  }
+
+  const skill = pendingHeroSkill.skill;
+  const target = point || { x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.58 };
+  spendHeroSkillEnergy();
+  if (skill === "vertical") {
+    const x = Math.max(58, Math.min(DESIGN_WIDTH - 58, target.x));
+    animateSkillSweep("vertical", x, 0xfff176);
+    const targets = balls.filter((ball) => Math.abs(ball.body.position.x - x) < 76);
+    removeBalls(targets.slice(0, 20), 120);
+  } else if (skill === "horizontal") {
+    const y = Math.max(250, Math.min(BOTTOM_SAFE_Y, target.y));
+    animateSkillSweep("horizontal", y, 0x9bf6ff);
+    const targets = balls.filter((ball) => Math.abs(ball.body.position.y - y) < 76);
+    removeBalls(targets.slice(0, 20), 120);
+  }
+
+  cancelPendingHeroSkill();
+  updateHeroUi();
+  if (isLevelComplete()) {
+    finishLevel(true);
+  }
+}
+
 function useHeroSkill() {
   if (!gameStarted || heroEnergy < HERO_MAX_ENERGY) {
     return;
   }
 
-  heroEnergy = 0;
-  triggerHaptic([60, 35, 100]);
-  playPopSound();
+  if (selectedHero.skill === "vertical" || selectedHero.skill === "horizontal") {
+    startTargetedHeroSkill();
+    return;
+  }
 
-  if (selectedHero.skill === "vertical") {
-    const targets = balls.filter((ball) => Math.abs(ball.body.position.x - DESIGN_WIDTH / 2) < 76);
-    removeBalls(targets.slice(0, 18), 120);
-  } else if (selectedHero.skill === "horizontal") {
-    const targets = balls.filter((ball) => Math.abs(ball.body.position.y - 590) < 76);
-    removeBalls(targets.slice(0, 18), 120);
-  } else if (selectedHero.skill === "shock") {
+  spendHeroSkillEnergy();
+
+  if (selectedHero.skill === "shock") {
+    animateSkillRing(DESIGN_WIDTH / 2, DESIGN_HEIGHT * 0.58, 0xa7f2ff);
     triggerPhysicsQuake({ x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.58 }, 9);
     removeBalls(shuffle(balls).slice(0, 8), 130);
   } else if (selectedHero.skill === "convert") {
+    animateSkillRing(DESIGN_WIDTH / 2, DESIGN_HEIGHT * 0.62, 0x73f7cf);
     const targets = shuffle(balls).slice(0, Math.min(14, balls.length));
     for (const ball of targets) {
       ball.spriteId = selectedHero.assetId;
@@ -1831,6 +2057,7 @@ function useHeroSkill() {
       ball.view.zIndex = 3;
       app.stage.addChild(ball.view);
       ball.view.position.set(ball.body.position.x, ball.body.position.y);
+      burstParticles(ball.body.position.x, ball.body.position.y);
     }
     triggerPhysicsQuake({ x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.62 }, 5);
   }
@@ -1870,16 +2097,19 @@ function createInteractionLayers() {
   lineGlow = new PIXI.Graphics();
   lineCore = new PIXI.Graphics();
   lineNodes = new PIXI.Graphics();
+  skillPreviewLine = new PIXI.Graphics();
   particleLayer = new PIXI.Container();
 
   lineGlow.zIndex = 30;
   lineCore.zIndex = 31;
   lineNodes.zIndex = 32;
+  skillPreviewLine.zIndex = 33;
   particleLayer.zIndex = 11;
 
   app.stage.addChild(lineGlow);
   app.stage.addChild(lineCore);
   app.stage.addChild(lineNodes);
+  app.stage.addChild(skillPreviewLine);
   app.stage.addChild(particleLayer);
 }
 
@@ -1952,6 +2182,7 @@ function updateFeedbackShake() {
 }
 
 function clearBalls() {
+  cancelPendingHeroSkill();
   clearSelection();
   for (const ball of balls) {
     Composite.remove(engine.world, ball.body);
@@ -2196,17 +2427,17 @@ function createHeroUi() {
   heroContainer.zIndex = 22;
 
   const pad = new PIXI.Graphics();
-  pad.beginFill(0x071018, 0.48);
+  pad.beginFill(0x071018, 0.58);
   pad.lineStyle(2, 0xffffff, 0.16);
-  pad.drawRoundedRect(24, DESIGN_HEIGHT - 132, DESIGN_WIDTH - 48, 108, 8);
+  pad.drawRoundedRect(24, HERO_PANEL_Y, DESIGN_WIDTH - 48, 118, 8);
   pad.endFill();
   heroContainer.addChild(pad);
 
   heroSprite = new PIXI.Sprite(PIXI.Texture.WHITE);
-  heroSprite.anchor.set(0.5, 1);
-  heroSprite.width = 118;
-  heroSprite.height = 118;
-  heroSprite.position.set(82, DESIGN_HEIGHT - 26);
+  heroSprite.anchor.set(0.5);
+  heroSprite.width = 96;
+  heroSprite.height = 96;
+  heroSprite.position.set(78, HERO_PANEL_Y + 60);
   heroContainer.addChild(heroSprite);
 
   heroSkillLabel = new PIXI.Text("", {
@@ -2215,7 +2446,7 @@ function createHeroUi() {
     fontSize: 16,
     fontWeight: "800",
   });
-  heroSkillLabel.position.set(150, DESIGN_HEIGHT - 118);
+  heroSkillLabel.position.set(134, HERO_PANEL_Y + 18);
   heroContainer.addChild(heroSkillLabel);
 
   heroSkillDesc = new PIXI.Text("", {
@@ -2224,14 +2455,14 @@ function createHeroUi() {
     fontSize: 12,
     fontWeight: "700",
     wordWrap: true,
-    wordWrapWidth: 138,
+    wordWrapWidth: 154,
   });
-  heroSkillDesc.position.set(150, DESIGN_HEIGHT - 94);
+  heroSkillDesc.position.set(134, HERO_PANEL_Y + 42);
   heroContainer.addChild(heroSkillDesc);
 
   const energyTrack = new PIXI.Graphics();
   energyTrack.beginFill(0x111820, 0.88);
-  energyTrack.drawRoundedRect(150, DESIGN_HEIGHT - 58, 130, 14, 7);
+  energyTrack.drawRoundedRect(134, HERO_PANEL_Y + 82, 150, 14, 7);
   energyTrack.endFill();
   heroContainer.addChild(energyTrack);
 
@@ -2244,10 +2475,10 @@ function createHeroUi() {
     fontSize: 12,
     fontWeight: "800",
   });
-  heroEnergyText.position.set(150, DESIGN_HEIGHT - 40);
+  heroEnergyText.position.set(134, HERO_PANEL_Y + 100);
   heroContainer.addChild(heroEnergyText);
 
-  heroSkillButton = createButton("技能", 300, DESIGN_HEIGHT - 86, 82, 44, useHeroSkill, {
+  heroSkillButton = createButton("技能", 306, HERO_PANEL_Y + 38, 78, 48, useHeroSkill, {
     fill: 0x2d5f58,
     line: 0x73f7cf,
     fontSize: 15,
@@ -2277,14 +2508,20 @@ function updateHeroUi() {
   if (heroEnergyBar) {
     heroEnergyBar.clear();
     heroEnergyBar.beginFill(ratio >= 1 ? 0xfff176 : 0x73f7cf, 0.95);
-    heroEnergyBar.drawRoundedRect(150, DESIGN_HEIGHT - 58, 130 * ratio, 14, 7);
+    heroEnergyBar.drawRoundedRect(134, HERO_PANEL_Y + 82, 150 * ratio, 14, 7);
     heroEnergyBar.endFill();
   }
   if (heroEnergyText) {
     heroEnergyText.text = ratio >= 1 ? "能量已满" : `能量 ${Math.floor(heroEnergy)}/${HERO_MAX_ENERGY}`;
   }
   if (heroSkillButton) {
-    heroSkillButton.alpha = ratio >= 1 ? 1 : 0.48;
+    heroSkillButton.alpha = ratio >= 1 ? 1 : 0.5;
+    setButtonStyle(heroSkillButton, {
+      fill: ratio >= 1 ? 0xffd66e : 0x2d5f58,
+      line: ratio >= 1 ? 0xffffff : 0x73f7cf,
+      lineAlpha: ratio >= 1 ? 0.95 : 0.5,
+      textFill: ratio >= 1 ? 0x111820 : 0xffffff,
+    });
   }
 }
 
@@ -2347,6 +2584,10 @@ function createButton(label, x, y, width, height, onTap, options = {}) {
   bg.drawRoundedRect(0, 0, width, height, 8);
   bg.endFill();
   container.addChild(bg);
+  container._buttonBg = bg;
+  container._buttonWidth = width;
+  container._buttonHeight = height;
+  container._buttonOptions = { ...options };
 
   const text = new PIXI.Text(label, {
     fill: options.textFill || 0xffffff,
@@ -2360,12 +2601,36 @@ function createButton(label, x, y, width, height, onTap, options = {}) {
   text.anchor.set(0.5);
   text.position.set(width / 2, height / 2);
   container.addChild(text);
+  container._buttonText = text;
 
   container.position.set(x, y);
   container.eventMode = "static";
   container.cursor = "pointer";
-  container.on("pointertap", onTap);
+  container.on("pointerdown", (event) => event.stopPropagation());
+  container.on("pointerup", (event) => event.stopPropagation());
+  container.on("pointertap", (event) => {
+    event.stopPropagation();
+    onTap(event);
+  });
   return container;
+}
+
+function setButtonStyle(container, options = {}) {
+  if (!container?._buttonBg) {
+    return;
+  }
+
+  container._buttonOptions = { ...container._buttonOptions, ...options };
+  const opts = container._buttonOptions;
+  const bg = container._buttonBg;
+  bg.clear();
+  bg.beginFill(opts.fill || 0x111820, opts.alpha ?? 0.86);
+  bg.lineStyle(2, opts.line || 0xffffff, opts.lineAlpha ?? 0.18);
+  bg.drawRoundedRect(0, 0, container._buttonWidth, container._buttonHeight, 8);
+  bg.endFill();
+  if (container._buttonText && opts.textFill) {
+    container._buttonText.style.fill = opts.textFill;
+  }
 }
 
 function setCollectionMessage(message) {
@@ -2732,6 +2997,7 @@ function hideLevelSelect() {
 function showLevelSelect() {
   gameStarted = false;
   clearSelection();
+  cancelPendingHeroSkill();
   hideResultOverlay();
 
   if (levelSelectContainer) {
@@ -2742,9 +3008,10 @@ function showLevelSelect() {
   levelSelectContainer.zIndex = 80;
 
   const shade = new PIXI.Graphics();
-  shade.beginFill(0x071018, 0.88);
+  shade.beginFill(0x071018, 0.96);
   shade.drawRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
   shade.endFill();
+  shade.eventMode = "static";
   levelSelectContainer.addChild(shade);
 
   const title = new PIXI.Text("关卡选择", {
@@ -2753,50 +3020,60 @@ function showLevelSelect() {
     fontSize: 34,
     fontWeight: "800",
   });
-  title.position.set(34, 92);
+  title.position.set(34, 78);
   levelSelectContainer.addChild(title);
 
-  const hint = new PIXI.Text("通关后解锁下一关；冲刺关可直接挑战并保存 1/3/5 分钟最高分。", {
+  const pageCount = Math.ceil(LEVELS.length / LEVELS_PER_PAGE);
+  levelSelectPage = Math.max(0, Math.min(levelSelectPage, pageCount - 1));
+  const startIndex = levelSelectPage * LEVELS_PER_PAGE;
+  const visibleLevels = LEVELS.slice(startIndex, startIndex + LEVELS_PER_PAGE);
+
+  const hint = new PIXI.Text(`第 ${levelSelectPage + 1}/${pageCount} 页 · 通关解锁下一关，冲刺关可直接挑战`, {
     fill: 0xbfeaf2,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
   });
-  hint.position.set(36, 138);
+  hint.position.set(36, 124);
   levelSelectContainer.addChild(hint);
 
-  LEVELS.forEach((level, index) => {
-    const y = 162 + index * 72;
+  visibleLevels.forEach((level, index) => {
+    const col = index % 2;
+    const row = Math.floor(index / 2);
+    const x = 28 + col * 194;
+    const y = 154 + row * 82;
     const locked = !level.infinite && level.id > unlockedLevel;
     const card = new PIXI.Graphics();
     card.beginFill(locked ? 0x17202a : level.background.top, locked ? 0.72 : 0.9);
     card.lineStyle(2, locked ? 0xffffff : level.background.accent, locked ? 0.12 : 0.42);
-    card.drawRoundedRect(28, y, DESIGN_WIDTH - 56, 62, 8);
+    card.drawRoundedRect(x, y, 180, 72, 8);
     card.endFill();
     levelSelectContainer.addChild(card);
 
-    const name = new PIXI.Text(`${level.name}  ${locked ? "未解锁" : level.subtitle}`, {
+    const name = new PIXI.Text(`${level.name}${locked ? " · 未解锁" : ""}`, {
       fill: locked ? 0x8d9aa8 : 0xffffff,
       fontFamily: "Arial, Microsoft YaHei, sans-serif",
-      fontSize: 15,
+      fontSize: 13,
       fontWeight: "800",
+      wordWrap: true,
+      wordWrapWidth: 112,
     });
-    name.position.set(46, y + 10);
+    name.position.set(x + 12, y + 8);
     levelSelectContainer.addChild(name);
 
     const timeLabel = Number.isFinite(level.duration) ? `${level.duration}秒` : "不限时";
-    const desc = new PIXI.Text(`${timeLabel} | ${describeGoals(level)} | 障碍 ${level.obstacles.length}`, {
+    const desc = new PIXI.Text(`${level.subtitle}\n${timeLabel} | ${describeGoals(level)}`, {
       fill: locked ? 0x77838f : 0xe8fbff,
       fontFamily: "Arial, Microsoft YaHei, sans-serif",
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: "700",
       wordWrap: true,
-      wordWrapWidth: 238,
+      wordWrapWidth: 112,
     });
-    desc.position.set(46, y + 34);
+    desc.position.set(x + 12, y + 32);
     levelSelectContainer.addChild(desc);
 
-    const action = createButton(locked ? "LOCK" : "START", 314, y + 12, 70, 38, () => {
+    const action = createButton(locked ? "LOCK" : "START", x + 118, y + 18, 56, 36, () => {
       if (!locked) {
         startLevel(level).catch(showFatalError);
       }
@@ -2804,10 +3081,38 @@ function showLevelSelect() {
       fill: locked ? 0x27313d : 0x0c1218,
       line: locked ? 0x596673 : level.background.accent,
       textFill: locked ? 0x7d8792 : 0xffffff,
-      fontSize: 13,
+      fontSize: 11,
     });
     levelSelectContainer.addChild(action);
   });
+
+  const prev = createButton("上一页", 68, 580, 104, 38, () => {
+    levelSelectPage = Math.max(0, levelSelectPage - 1);
+    showLevelSelect();
+  }, {
+    fill: levelSelectPage > 0 ? 0x27313d : 0x161d25,
+    line: 0x9fd6ff,
+    textFill: levelSelectPage > 0 ? 0xffffff : 0x6f7b86,
+    fontSize: 13,
+  });
+  const next = createButton("下一页", 258, 580, 104, 38, () => {
+    levelSelectPage = Math.min(pageCount - 1, levelSelectPage + 1);
+    showLevelSelect();
+  }, {
+    fill: levelSelectPage < pageCount - 1 ? 0x27313d : 0x161d25,
+    line: 0x9fd6ff,
+    textFill: levelSelectPage < pageCount - 1 ? 0xffffff : 0x6f7b86,
+    fontSize: 13,
+  });
+  levelSelectContainer.addChild(prev);
+  levelSelectContainer.addChild(next);
+
+  const heroPanel = new PIXI.Graphics();
+  heroPanel.beginFill(0x071018, 0.92);
+  heroPanel.lineStyle(2, 0xfff176, 0.18);
+  heroPanel.drawRoundedRect(24, 630, DESIGN_WIDTH - 48, 196, 8);
+  heroPanel.endFill();
+  levelSelectContainer.addChild(heroPanel);
 
   const heroTitle = new PIXI.Text("选择松松英雄", {
     fill: 0xfff176,
@@ -2815,12 +3120,44 @@ function showLevelSelect() {
     fontSize: 14,
     fontWeight: "800",
   });
-  heroTitle.position.set(34, 748);
+  heroTitle.position.set(34, 644);
   levelSelectContainer.addChild(heroTitle);
 
   HEROES.forEach((hero, index) => {
     const selected = hero.id === selectedHeroId;
-    const button = createButton(hero.name, 34 + index * 94, 774, 82, 40, () => {
+    const x = 34 + index * 94;
+    const button = new PIXI.Container();
+    const bg = new PIXI.Graphics();
+    bg.beginFill(selected ? 0x2d5f58 : 0x17202a, 0.9);
+    bg.lineStyle(2, selected ? 0x73f7cf : 0xffffff, selected ? 0.85 : 0.18);
+    bg.drawRoundedRect(0, 0, 82, 88, 8);
+    bg.endFill();
+    button.addChild(bg);
+
+    const avatar = new PIXI.Sprite(heroTextures.get(hero.id) || PIXI.Texture.WHITE);
+    avatar.anchor.set(0.5);
+    avatar.width = 52;
+    avatar.height = 52;
+    avatar.position.set(41, 32);
+    button.addChild(avatar);
+
+    const label = new PIXI.Text(hero.name, {
+      fill: 0xffffff,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 12,
+      fontWeight: "800",
+      align: "center",
+    });
+    label.anchor.set(0.5, 0);
+    label.position.set(41, 62);
+    button.addChild(label);
+
+    button.position.set(x, 672);
+    button.eventMode = "static";
+    button.cursor = "pointer";
+    button.on("pointerdown", (event) => event.stopPropagation());
+    button.on("pointertap", (event) => {
+      event.stopPropagation();
       selectedHero = hero;
       selectedHeroId = hero.id;
       window.localStorage.setItem(HERO_STORAGE_KEY, hero.id);
@@ -2828,11 +3165,6 @@ function showLevelSelect() {
         updateHeroUi();
         showLevelSelect();
       }).catch(showFatalError);
-    }, {
-      fill: selected ? 0x2d5f58 : 0x17202a,
-      line: selected ? 0x73f7cf : 0xffffff,
-      lineAlpha: selected ? 0.85 : 0.18,
-      fontSize: 13,
     });
     levelSelectContainer.addChild(button);
   });
@@ -2845,7 +3177,7 @@ function showLevelSelect() {
     wordWrap: true,
     wordWrapWidth: DESIGN_WIDTH - 68,
   });
-  heroDesc.position.set(34, 824);
+  heroDesc.position.set(34, 770);
   levelSelectContainer.addChild(heroDesc);
 
   app.stage.addChild(levelSelectContainer);
@@ -2912,9 +3244,9 @@ function showResultOverlay(passed) {
   }, { fill: 0x27313d, line: 0x9fd6ff });
   resultOverlay.addChild(retry);
 
-  const nextLabel = passed && currentLevel?.id < 5 ? "下一关" : "关卡";
+  const nextLabel = passed && currentLevel?.id < 20 ? "下一关" : "关卡";
   const next = createButton(nextLabel, 232, 444, 132, 52, () => {
-    if (passed && currentLevel?.id < 5) {
+    if (passed && currentLevel?.id < 20) {
       startLevel(LEVELS[currentLevel.id]).catch(showFatalError);
       return;
     }
@@ -2984,6 +3316,12 @@ function startTicker() {
     }
 
     updateParticles();
+    if (heroSkillButton && heroEnergy >= HERO_MAX_ENERGY && gameStarted) {
+      const pulse = 1 + Math.sin(now / 160) * 0.055;
+      heroSkillButton.scale.set(pulse);
+    } else if (heroSkillButton) {
+      heroSkillButton.scale.set(1);
+    }
     updateFeedbackShake();
   });
 }
@@ -3009,6 +3347,7 @@ async function main() {
   setupInput();
   startPhysics();
   startTicker();
+  await loadHeroTextures();
   showLevelSelect();
 
   if (loadingEl) {
