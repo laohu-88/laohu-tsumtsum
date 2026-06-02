@@ -21,6 +21,14 @@ const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 30;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
 const SPRINT_BEST_STORAGE_KEY = "laohu-tsumtsum-sprint-best-v1";
 const HERO_STORAGE_KEY = "laohu-tsumtsum-hero-v1";
+const COINS_STORAGE_KEY = "laohu-tsumtsum-coins-v1";
+const COLLECTION_STORAGE_KEY = "laohu-tsumtsum-collection-v1";
+const GACHA_COST = 100;
+const DUPLICATE_REFUND = 20;
+const GACHA_CHEST_FRAMES = [
+  70085, 70089, 70092, 70093, 70098, 70100, 70103, 70105, 70109, 70111, 70115, 70117, 70122, 70123, 70127,
+  70460, 70461, 70464, 70469, 70472, 70474, 70477, 70479, 70482, 70486, 70490, 70493,
+];
 const HERO_MAX_ENERGY = 100;
 
 const HEROES = [
@@ -241,6 +249,20 @@ let sprintBestScores = {};
 let selectedHeroId = HEROES[0].id;
 let selectedHero = HEROES[0];
 let selectedHeroTexture = null;
+let coins = 0;
+let unlockedSprites = new Set();
+let coinsText = null;
+let collectionOverlay = null;
+let collectionGrid = null;
+let collectionMessageText = null;
+let collectionCountText = null;
+let collectionCoinText = null;
+let collectionFilter = "all";
+let collectionRenderToken = 0;
+let collectionDetailLayer = null;
+let gachaResultLayer = null;
+let gachaAnimating = false;
+let lastCoinsEarned = 0;
 let heroContainer = null;
 let heroSprite = null;
 let heroEnergyBar = null;
@@ -281,6 +303,15 @@ function pickRoundSprites() {
   return shuffle(ids).slice(0, PARTICIPANT_COUNT);
 }
 
+function normalizeSpriteId(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id >= FIRST_SPRITE_ID && id <= LAST_SPRITE_ID ? id : null;
+}
+
+function allSpriteIds() {
+  return Array.from({ length: TOTAL_SPRITES }, (_, index) => index + FIRST_SPRITE_ID);
+}
+
 function loadProgress() {
   const saved = Number(window.localStorage.getItem(PROGRESS_STORAGE_KEY));
   if (Number.isFinite(saved) && saved >= 1) {
@@ -296,11 +327,57 @@ function loadProgress() {
   const savedHeroId = window.localStorage.getItem(HERO_STORAGE_KEY);
   selectedHero = HEROES.find((hero) => hero.id === savedHeroId) || HEROES[0];
   selectedHeroId = selectedHero.id;
+
+  const savedCoins = Number(window.localStorage.getItem(COINS_STORAGE_KEY));
+  coins = Number.isFinite(savedCoins) && savedCoins > 0 ? Math.floor(savedCoins) : 0;
+
+  try {
+    const savedCollection = JSON.parse(window.localStorage.getItem(COLLECTION_STORAGE_KEY) || "[]");
+    unlockedSprites = new Set((Array.isArray(savedCollection) ? savedCollection : []).map(normalizeSpriteId).filter(Boolean));
+  } catch (_) {
+    unlockedSprites = new Set();
+  }
 }
 
 function saveProgress(levelId) {
   unlockedLevel = Math.min(LEVELS.length, Math.max(unlockedLevel, levelId + 1));
   window.localStorage.setItem(PROGRESS_STORAGE_KEY, String(unlockedLevel));
+}
+
+function saveCoins() {
+  window.localStorage.setItem(COINS_STORAGE_KEY, String(coins));
+  updateCoinsUi();
+}
+
+function saveCollection() {
+  window.localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify([...unlockedSprites].sort((a, b) => a - b)));
+}
+
+function addCoins(amount) {
+  coins = Math.max(0, coins + Math.floor(amount));
+  saveCoins();
+}
+
+function awardCoinsForScore(finalScore) {
+  const earned = Math.floor(Math.max(0, finalScore) * 0.1);
+  if (earned > 0) {
+    addCoins(earned);
+  } else {
+    updateCoinsUi();
+  }
+  return earned;
+}
+
+function updateCoinsUi() {
+  if (coinsText) {
+    coinsText.text = `Coins ${coins}`;
+  }
+  if (collectionCoinText) {
+    collectionCoinText.textContent = `金币 ${coins}`;
+  }
+  if (collectionCountText) {
+    collectionCountText.textContent = `已解锁 ${unlockedSprites.size}/${TOTAL_SPRITES}`;
+  }
 }
 
 function saveSprintBest(level, finalScore) {
@@ -567,6 +644,308 @@ async function loadHeroTexture() {
     });
     loader.onError.add((error) => reject(error));
   });
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+function ensureCollectionStyles() {
+  if (document.getElementById("collection-styles")) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = "collection-styles";
+  style.textContent = `
+    .collection-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: max(14px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      background: rgba(4, 10, 17, 0.74);
+      touch-action: none;
+    }
+    .collection-panel {
+      width: min(420px, 100%);
+      max-height: min(888px, 100%);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 2px solid rgba(255, 218, 110, 0.72);
+      border-radius: 8px;
+      color: #fff;
+      background:
+        linear-gradient(180deg, rgba(31, 104, 132, 0.96), rgba(15, 25, 42, 0.98) 42%, rgba(34, 22, 42, 0.98));
+      box-shadow: 0 22px 90px rgba(0, 0, 0, 0.54);
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      touch-action: auto;
+    }
+    .collection-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 16px 16px 10px;
+      background: linear-gradient(90deg, rgba(255, 214, 110, 0.24), rgba(124, 241, 211, 0.12));
+    }
+    .collection-title {
+      font-size: 24px;
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+    .collection-stats {
+      margin-top: 6px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: #dffbff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .collection-close {
+      width: 36px;
+      height: 36px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 8px;
+      color: #fff;
+      background: rgba(7, 16, 24, 0.58);
+      font-size: 22px;
+      font-weight: 900;
+    }
+    .collection-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      padding: 10px 16px 12px;
+      background: rgba(5, 14, 22, 0.24);
+    }
+    .gacha-button {
+      min-height: 50px;
+      border: 2px solid rgba(255, 241, 118, 0.78);
+      border-radius: 8px;
+      color: #201507;
+      background: linear-gradient(180deg, #fff176, #ffb347);
+      font-size: 17px;
+      font-weight: 900;
+      box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45), 0 8px 22px rgba(0, 0, 0, 0.24);
+    }
+    .collection-message {
+      min-height: 18px;
+      color: #ffeaa0;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+    }
+    .collection-filters {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .collection-filter {
+      min-height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 8px;
+      color: #dffbff;
+      background: rgba(6, 17, 26, 0.5);
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .collection-filter.active {
+      color: #201507;
+      border-color: rgba(255, 241, 118, 0.84);
+      background: linear-gradient(180deg, #fff176, #ffbc55);
+    }
+    .collection-grid {
+      overflow: auto;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-auto-rows: 70px;
+      gap: 10px;
+      padding: 14px 14px 18px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .collection-card {
+      min-width: 0;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      background: radial-gradient(circle at 38% 28%, rgba(255, 255, 255, 0.18), rgba(3, 9, 15, 0.62));
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      padding: 0;
+    }
+    .collection-card:disabled {
+      cursor: default;
+    }
+    .collection-card img {
+      width: 82%;
+      height: 82%;
+      object-fit: contain;
+      display: block;
+    }
+    .collection-card.locked img {
+      filter: grayscale(100%) brightness(0);
+      opacity: 0.78;
+    }
+    .collection-card span {
+      position: absolute;
+      left: 5px;
+      bottom: 4px;
+      padding: 1px 5px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.42);
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .collection-empty {
+      grid-column: 1 / -1;
+      padding: 28px 12px;
+      color: #dffbff;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .collection-detail {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      box-sizing: border-box;
+      background: rgba(3, 8, 13, 0.82);
+    }
+    .collection-detail-card {
+      width: min(340px, 92vw);
+      display: grid;
+      gap: 12px;
+      border: 2px solid rgba(255, 241, 118, 0.76);
+      border-radius: 8px;
+      padding: 14px;
+      box-sizing: border-box;
+      color: #fff;
+      background: radial-gradient(circle at 50% 18%, rgba(255, 241, 118, 0.24), rgba(18, 25, 35, 0.97) 48%, rgba(28, 17, 38, 0.98));
+      box-shadow: 0 18px 70px rgba(0, 0, 0, 0.52);
+    }
+    .collection-detail-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+    .collection-detail-close {
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 8px;
+      color: #fff;
+      background: rgba(7, 16, 24, 0.58);
+      font-size: 20px;
+      font-weight: 900;
+    }
+    .collection-detail-body {
+      display: grid;
+      grid-template-columns: 108px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+    .collection-sticker,
+    .collection-closeup {
+      display: grid;
+      place-items: center;
+      min-height: 120px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+    .collection-sticker img {
+      width: 92%;
+      height: 92%;
+      object-fit: contain;
+    }
+    .collection-closeup img {
+      width: 160%;
+      height: 160%;
+      object-fit: contain;
+      image-rendering: auto;
+    }
+    .collection-detail-caption {
+      color: #ffeaa0;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+    }
+    @media (max-width: 360px) {
+      .collection-detail-body {
+        grid-template-columns: 1fr;
+      }
+      .collection-grid {
+        grid-auto-rows: 62px;
+      }
+    }
+    .gacha-stage {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(3, 8, 13, 0.82);
+    }
+    .gacha-stage-inner {
+      width: min(330px, 86vw);
+      min-height: 390px;
+      display: grid;
+      place-items: center;
+      border: 2px solid rgba(255, 241, 118, 0.76);
+      border-radius: 8px;
+      background: radial-gradient(circle at 50% 18%, rgba(255, 241, 118, 0.34), rgba(18, 25, 35, 0.96) 46%, rgba(28, 17, 38, 0.98));
+    }
+    .gacha-chest {
+      width: 190px;
+      height: 190px;
+      object-fit: contain;
+      animation: gachaPulse 0.42s ease-in-out infinite alternate;
+    }
+    .gacha-result {
+      width: 230px;
+      height: 230px;
+      object-fit: contain;
+      animation: gachaSpin 1.15s cubic-bezier(.2,.8,.3,1) both;
+    }
+    .gacha-result-text {
+      min-height: 54px;
+      padding: 0 20px;
+      color: #fff7bf;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.35;
+    }
+    @keyframes gachaPulse {
+      from { transform: scale(0.9) rotate(-8deg); }
+      to { transform: scale(1.12) rotate(10deg); }
+    }
+    @keyframes gachaSpin {
+      from { transform: perspective(500px) rotateY(0deg) scale(0.35); opacity: 0; }
+      60% { transform: perspective(500px) rotateY(360deg) scale(1.14); opacity: 1; }
+      to { transform: perspective(500px) rotateY(720deg) scale(1); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 function makeCircularSprite(texture, isTarget = false) {
@@ -1787,7 +2166,29 @@ function createHud() {
   levels.on("pointertap", showLevelSelect);
   app.stage.addChild(levels);
 
+  coinsText = new PIXI.Text("", {
+    fill: 0xfff176,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 14,
+    fontWeight: "800",
+  });
+  coinsText.anchor.set(1, 0);
+  coinsText.position.set(DESIGN_WIDTH - 34, HUD_TOP - 23);
+  coinsText.zIndex = 86;
+  app.stage.addChild(coinsText);
+
+  const collection = createButton("图鉴", DESIGN_WIDTH - 104, HUD_TOP + 64, 70, 34, showCollectionBook, {
+    fill: 0x7a3047,
+    line: 0xffd66e,
+    lineAlpha: 0.7,
+    textFill: 0xfff7c8,
+    fontSize: 14,
+  });
+  collection.zIndex = 86;
+  app.stage.addChild(collection);
+
   createHeroUi();
+  updateCoinsUi();
 }
 
 function createHeroUi() {
@@ -1967,6 +2368,361 @@ function createButton(label, x, y, width, height, onTap, options = {}) {
   return container;
 }
 
+function setCollectionMessage(message) {
+  if (collectionMessageText) {
+    collectionMessageText.textContent = message || "";
+  }
+}
+
+function refreshCollectionGrid() {
+  if (!collectionGrid) {
+    return;
+  }
+
+  const cards = collectionGrid.querySelectorAll("[data-sprite-id]");
+  cards.forEach((card) => {
+    const id = normalizeSpriteId(card.getAttribute("data-sprite-id"));
+    card.classList.toggle("locked", !unlockedSprites.has(id));
+  });
+  if (collectionFilter !== "all") {
+    renderCollectionGrid();
+  }
+  updateCoinsUi();
+}
+
+function getCollectionIdsForFilter() {
+  const ids = allSpriteIds();
+  if (collectionFilter === "unlocked") {
+    return ids.filter((id) => unlockedSprites.has(id));
+  }
+  if (collectionFilter === "locked") {
+    return ids.filter((id) => !unlockedSprites.has(id));
+  }
+  return ids;
+}
+
+function setCollectionFilter(filter) {
+  collectionFilter = filter;
+  const buttons = collectionOverlay ? collectionOverlay.querySelectorAll("[data-collection-filter]") : [];
+  buttons.forEach((button) => {
+    button.classList.toggle("active", button.getAttribute("data-collection-filter") === collectionFilter);
+  });
+  renderCollectionGrid();
+}
+
+function renderCollectionGrid() {
+  if (!collectionGrid) {
+    return;
+  }
+
+  collectionRenderToken += 1;
+  const token = collectionRenderToken;
+  const ids = getCollectionIdsForFilter();
+  let index = 0;
+  const batchSize = 42;
+  collectionGrid.textContent = "";
+
+  if (!ids.length) {
+    const empty = document.createElement("div");
+    empty.className = "collection-empty";
+    empty.textContent = collectionFilter === "unlocked" ? "还没有已解锁的松松" : "这一页暂时没有内容";
+    collectionGrid.appendChild(empty);
+    return;
+  }
+
+  const appendBatch = () => {
+    if (token !== collectionRenderToken || !collectionGrid) {
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    const end = Math.min(index + batchSize, ids.length);
+    for (; index < end; index += 1) {
+      fragment.appendChild(createCollectionCard(ids[index]));
+    }
+    collectionGrid.appendChild(fragment);
+
+    if (index < ids.length) {
+      window.requestAnimationFrame(appendBatch);
+    }
+  };
+
+  appendBatch();
+}
+
+function createCollectionCard(id) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = `collection-card${unlockedSprites.has(id) ? "" : " locked"}`;
+  card.setAttribute("data-sprite-id", String(id));
+  card.setAttribute("aria-label", `松松 ${id}`);
+
+  const image = document.createElement("img");
+  image.src = `assets/${id}.png`;
+  image.alt = `松松 ${id}`;
+  image.loading = "lazy";
+  image.decoding = "async";
+  card.appendChild(image);
+
+  const label = document.createElement("span");
+  label.textContent = String(id);
+  card.appendChild(label);
+  card.addEventListener("click", () => {
+    if (unlockedSprites.has(id)) {
+      showCollectionDetail(id);
+      return;
+    }
+    setCollectionMessage(`No.${id} locked`);
+  });
+  return card;
+}
+
+function showCollectionDetail(id) {
+  if (!collectionOverlay || !unlockedSprites.has(id)) {
+    return;
+  }
+
+  hideCollectionDetail();
+
+  collectionDetailLayer = document.createElement("div");
+  collectionDetailLayer.className = "collection-detail";
+  collectionDetailLayer.addEventListener("click", (event) => {
+    if (event.target === collectionDetailLayer) {
+      hideCollectionDetail();
+    }
+  });
+
+  const card = document.createElement("section");
+  card.className = "collection-detail-card";
+  card.setAttribute("aria-label", `No.${id} detail`);
+
+  const head = document.createElement("div");
+  head.className = "collection-detail-head";
+  const title = document.createElement("div");
+  title.textContent = `No.${id}`;
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "collection-detail-close";
+  close.textContent = "x";
+  close.addEventListener("click", hideCollectionDetail);
+  head.append(title, close);
+
+  const body = document.createElement("div");
+  body.className = "collection-detail-body";
+  const sticker = document.createElement("div");
+  sticker.className = "collection-sticker";
+  const stickerImage = document.createElement("img");
+  stickerImage.src = `assets/${id}.png`;
+  stickerImage.alt = `No.${id} sticker`;
+  sticker.appendChild(stickerImage);
+
+  const closeup = document.createElement("div");
+  closeup.className = "collection-closeup";
+  const closeupImage = document.createElement("img");
+  closeupImage.src = `assets/${id}.png`;
+  closeupImage.alt = `No.${id} close-up`;
+  closeup.appendChild(closeupImage);
+  body.append(sticker, closeup);
+
+  const caption = document.createElement("div");
+  caption.className = "collection-detail-caption";
+  caption.textContent = "Sticker / close-up";
+
+  card.append(head, body, caption);
+  collectionDetailLayer.appendChild(card);
+  collectionOverlay.appendChild(collectionDetailLayer);
+}
+
+function hideCollectionDetail() {
+  if (collectionDetailLayer) {
+    collectionDetailLayer.remove();
+    collectionDetailLayer = null;
+  }
+}
+
+function showCollectionBook() {
+  ensureCollectionStyles();
+  if (collectionOverlay) {
+    collectionOverlay.remove();
+  }
+
+  collectionOverlay = document.createElement("div");
+  collectionOverlay.className = "collection-overlay";
+  collectionOverlay.addEventListener("pointerdown", (event) => event.stopPropagation());
+  collectionOverlay.addEventListener("touchstart", (event) => event.stopPropagation(), { passive: true });
+
+  const panel = document.createElement("section");
+  panel.className = "collection-panel";
+  panel.setAttribute("aria-label", "松松图鉴");
+
+  const head = document.createElement("div");
+  head.className = "collection-head";
+
+  const titleBlock = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = "collection-title";
+  title.textContent = "松松图鉴";
+  titleBlock.appendChild(title);
+
+  const stats = document.createElement("div");
+  stats.className = "collection-stats";
+  collectionCoinText = document.createElement("span");
+  collectionCountText = document.createElement("span");
+  stats.append(collectionCoinText, collectionCountText);
+  titleBlock.appendChild(stats);
+
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "collection-close";
+  close.textContent = "×";
+  close.addEventListener("click", hideCollectionBook);
+
+  head.append(titleBlock, close);
+
+  const actions = document.createElement("div");
+  actions.className = "collection-actions";
+  const gacha = document.createElement("button");
+  gacha.type = "button";
+  gacha.className = "gacha-button";
+  gacha.textContent = `单抽  ${GACHA_COST} 金币`;
+  gacha.addEventListener("click", runSingleGacha);
+  collectionMessageText = document.createElement("div");
+  collectionMessageText.className = "collection-message";
+  const filters = document.createElement("div");
+  filters.className = "collection-filters";
+  [
+    ["all", "全部"],
+    ["unlocked", "已解锁"],
+    ["locked", "未解锁"],
+  ].forEach(([value, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `collection-filter${collectionFilter === value ? " active" : ""}`;
+    button.setAttribute("data-collection-filter", value);
+    button.textContent = label;
+    button.addEventListener("click", () => setCollectionFilter(value));
+    filters.appendChild(button);
+  });
+  actions.append(gacha, filters, collectionMessageText);
+
+  collectionGrid = document.createElement("div");
+  collectionGrid.className = "collection-grid";
+
+  panel.append(head, actions, collectionGrid);
+  collectionOverlay.appendChild(panel);
+  document.body.appendChild(collectionOverlay);
+  updateCoinsUi();
+  renderCollectionGrid();
+  setCollectionMessage("抽中后会点亮对应松松，重复返还 20 金币");
+}
+
+function hideCollectionBook() {
+  if (collectionOverlay) {
+    collectionOverlay.remove();
+    collectionOverlay = null;
+  }
+  collectionGrid = null;
+  collectionMessageText = null;
+  collectionCountText = null;
+  collectionCoinText = null;
+  collectionRenderToken += 1;
+  collectionDetailLayer = null;
+  gachaResultLayer = null;
+  gachaAnimating = false;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function runSingleGacha() {
+  if (gachaAnimating) {
+    return;
+  }
+  if (coins < GACHA_COST) {
+    setCollectionMessage(`金币不足，还需要 ${GACHA_COST - coins} 金币`);
+    return;
+  }
+
+  gachaAnimating = true;
+  coins -= GACHA_COST;
+  saveCoins();
+  setCollectionMessage("宝箱开启中...");
+
+  const resultId = FIRST_SPRITE_ID + Math.floor(Math.random() * TOTAL_SPRITES);
+  const isNew = !unlockedSprites.has(resultId);
+
+  try {
+    await playGachaAnimation(resultId, isNew);
+  } catch (_) {
+    revealGachaResult(resultId, isNew);
+    gachaAnimating = false;
+  }
+}
+
+async function playGachaAnimation(resultId, isNew) {
+  if (!collectionOverlay) {
+    gachaAnimating = false;
+    return;
+  }
+
+  gachaResultLayer = document.createElement("div");
+  gachaResultLayer.className = "gacha-stage";
+  const inner = document.createElement("div");
+  inner.className = "gacha-stage-inner";
+  const chest = document.createElement("img");
+  chest.className = "gacha-chest";
+  chest.alt = "抽卡宝箱";
+  const message = document.createElement("div");
+  message.className = "gacha-result-text";
+  message.textContent = "宝箱开启中...";
+  inner.append(chest, message);
+  gachaResultLayer.appendChild(inner);
+  collectionOverlay.appendChild(gachaResultLayer);
+
+  for (let i = 0; i < GACHA_CHEST_FRAMES.length; i += 1) {
+    chest.src = `sszdy_assets/Sprite_Sprite_${GACHA_CHEST_FRAMES[i]}.png`;
+    await delay(42);
+  }
+
+  await loadImage(`assets/${resultId}.png`).catch(() => {});
+  inner.textContent = "";
+  const resultImage = document.createElement("img");
+  resultImage.className = "gacha-result";
+  resultImage.src = `assets/${resultId}.png`;
+  resultImage.alt = `松松 ${resultId}`;
+  const resultText = document.createElement("div");
+  resultText.className = "gacha-result-text";
+  inner.append(resultImage, resultText);
+  revealGachaResult(resultId, isNew, resultText);
+  await delay(1700);
+  if (gachaResultLayer) {
+    gachaResultLayer.remove();
+    gachaResultLayer = null;
+  }
+  gachaAnimating = false;
+}
+
+function revealGachaResult(resultId, isNew, resultText) {
+  if (isNew) {
+    unlockedSprites.add(resultId);
+    saveCollection();
+    setCollectionMessage(`恭喜解锁新伙伴！No.${resultId}`);
+    if (resultText) {
+      resultText.textContent = `恭喜解锁新伙伴！\nNo.${resultId}`;
+    }
+  } else {
+    addCoins(DUPLICATE_REFUND);
+    setCollectionMessage(`No.${resultId} 已重复，返还 ${DUPLICATE_REFUND} 金币`);
+    if (resultText) {
+      resultText.textContent = `已重复\n返还 ${DUPLICATE_REFUND} 金币`;
+    }
+  }
+  refreshCollectionGrid();
+}
+
 function hideLevelSelect() {
   if (levelSelectContainer) {
     levelSelectContainer.visible = false;
@@ -2134,9 +2890,10 @@ function showResultOverlay(passed) {
   resultOverlay.addChild(title);
 
   const sprintBest = currentLevel?.sprintMinutes ? (sprintBestScores[String(currentLevel.sprintMinutes)] || 0) : 0;
-  const detailText = isSprint
+  let detailText = isSprint
     ? `得分 ${score}   ${currentLevel.sprintMinutes}分钟最高 ${sprintBest}\n${levelEndReason === "newBest" ? "新纪录" : "继续冲刺可刷新纪录"}`
     : `得分 ${score}   ${currentLevel ? describeGoals(currentLevel) : ""}\n${goalText?.text || ""}`;
+  detailText += `\n本局获得 ${lastCoinsEarned} Coins   当前 ${coins} Coins`;
   const detail = new PIXI.Text(detailText, {
     fill: 0xdff7ff,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
@@ -2175,6 +2932,7 @@ function finishLevel(passed) {
 
   gameStarted = false;
   clearSelection();
+  lastCoinsEarned = awardCoinsForScore(score);
   if (passed && currentLevel && !currentLevel.infinite) {
     saveProgress(currentLevel.id);
   }

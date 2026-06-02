@@ -1,6 +1,10 @@
-const CACHE_NAME = "laohu-tsumtsum-v25";
+const CACHE_NAME = "laohu-tsumtsum-v26";
 const FIRST_SPRITE_ID = 1;
 const TOTAL_SPRITES = 422;
+const GACHA_CHEST_FRAMES = [
+  70085, 70089, 70092, 70093, 70098, 70100, 70103, 70105, 70109, 70111, 70115, 70117, 70122, 70123, 70127,
+  70460, 70461, 70464, 70469, 70472, 70474, 70477, 70479, 70482, 70486, 70490, 70493,
+];
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -17,6 +21,7 @@ const CORE_ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   ...Array.from({ length: TOTAL_SPRITES }, (_, index) => `./assets/${index + FIRST_SPRITE_ID}.png`),
+  ...GACHA_CHEST_FRAMES.map((id) => `./sszdy_assets/Sprite_Sprite_${id}.png`),
 ];
 
 self.addEventListener("install", (event) => {
