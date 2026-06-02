@@ -18,8 +18,8 @@ const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const SHORT_CLEAR_SOUND_PATH = "pop_bomb.wav?v=32";
 const LONG_CLEAR_SOUND_PATH = "pop_big.wav?v=1";
-const COLLECTION_ASSET_MAP_PATH = "collection-assets.json?v=3";
-const COLLECTION_CATALOG_PATH = "collection-catalog.json?v=1";
+const COLLECTION_CATALOG_PATH = "collection-catalog.json?v=2";
+const COLLECTION_CHARACTER_ASSET_PATH = "collection-character-assets.json?v=1";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 118;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
@@ -383,10 +383,12 @@ let collectionCoinText = null;
 let collectionFilter = "all";
 let collectionRenderToken = 0;
 let collectionDetailLayer = null;
-let collectionAssetMap = null;
-let collectionAssetMapPromise = null;
 let collectionCatalogMap = null;
 let collectionCatalogPromise = null;
+let collectionCharacterAssetMap = null;
+let collectionCharacterAssetPromise = null;
+let collectionDetailRenderToken = 0;
+let gachaChestFrameSourcesPromise = null;
 let imageAvailabilityCache = new Map();
 let gachaResultLayer = null;
 let gachaAnimating = false;
@@ -451,11 +453,12 @@ function allSpriteIds() {
 }
 
 function loadProgress() {
+  const params = new URLSearchParams(window.location.search);
   const saved = Number(window.localStorage.getItem(PROGRESS_STORAGE_KEY));
   if (Number.isFinite(saved) && saved >= 1) {
     unlockedLevel = Math.min(LEVELS.length, saved);
   }
-  if (new URLSearchParams(window.location.search).has("unlockAll")) {
+  if (params.has("unlockAll")) {
     unlockedLevel = LEVELS.length;
   }
 
@@ -471,7 +474,7 @@ function loadProgress() {
 
   const savedCoins = Number(window.localStorage.getItem(COINS_STORAGE_KEY));
   coins = Number.isFinite(savedCoins) && savedCoins > 0 ? Math.floor(savedCoins) : 0;
-  const testCoins = Number(new URLSearchParams(window.location.search).get("testCoins"));
+  const testCoins = Number(params.get("testCoins"));
   if (Number.isFinite(testCoins) && testCoins > 0) {
     coins = Math.floor(testCoins);
   }
@@ -481,6 +484,9 @@ function loadProgress() {
     unlockedSprites = new Set((Array.isArray(savedCollection) ? savedCollection : []).map(normalizeSpriteId).filter(Boolean));
   } catch (_) {
     unlockedSprites = new Set();
+  }
+  if (params.has("unlockCollection")) {
+    unlockedSprites = new Set(allSpriteIds());
   }
 }
 
@@ -1080,16 +1086,17 @@ function ensureCollectionStyles() {
       align-items: stretch;
     }
     .collection-original,
-    .collection-closeups,
-    .collection-rotator {
+    .collection-closeups {
       position: relative;
       display: grid;
       place-items: center;
-      min-height: 142px;
       border: 1px solid rgba(255, 255, 255, 0.16);
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.08);
       overflow: hidden;
+    }
+    .collection-original {
+      min-height: 246px;
     }
     .collection-original img {
       width: 94%;
@@ -1121,36 +1128,17 @@ function ensureCollectionStyles() {
       line-height: 1.35;
     }
     .collection-closeups {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6px;
-      padding: 8px;
-      min-height: 94px;
+      min-height: 112px;
+      padding: 10px;
       box-sizing: border-box;
     }
     .collection-closeups img {
-      width: 100%;
-      height: 78px;
+      width: 102px;
+      height: 102px;
       object-fit: contain;
       background: rgba(0, 0, 0, 0.18);
-      border-radius: 6px;
-    }
-    .collection-rotator {
-      min-height: 170px;
-      perspective: 780px;
-    }
-    .collection-rotator img {
-      width: 86%;
-      height: 86%;
-      object-fit: contain;
-      animation: collectionRotate 4s linear infinite;
-      transform-origin: center;
+      border-radius: 8px;
       filter: drop-shadow(0 16px 18px rgba(0, 0, 0, 0.38));
-    }
-    .collection-detail-caption {
-      color: #ffeaa0;
-      font-size: 13px;
-      font-weight: 800;
-      text-align: center;
     }
     @media (max-width: 360px) {
       .collection-grid {
@@ -1193,9 +1181,6 @@ function ensureCollectionStyles() {
       object-fit: contain;
       animation: gachaPulse 0.42s ease-in-out infinite alternate;
     }
-    .gacha-chest.loading {
-      visibility: hidden;
-    }
     .gacha-chest-shell {
       position: relative;
       width: 190px;
@@ -1217,7 +1202,7 @@ function ensureCollectionStyles() {
       top: 8px;
       height: 74px;
       border-radius: 70px 70px 12px 12px;
-      background: linear-gradient(135deg, #ffdf74, #d55b44 54%, #7a3047);
+      background: linear-gradient(135deg, #ffe485, #8a62dc 54%, #4c317c);
       transform-origin: 50% 100%;
       animation: gachaLid 0.56s ease-in-out infinite alternate;
     }
@@ -1225,7 +1210,7 @@ function ensureCollectionStyles() {
       bottom: 0;
       height: 92px;
       border-radius: 8px;
-      background: linear-gradient(135deg, #7a3047, #d65a42 48%, #ffd66e);
+      background: linear-gradient(135deg, #4c317c, #8a62dc 48%, #ffd66e);
     }
     .gacha-chest-lock {
       position: relative;
@@ -1264,11 +1249,6 @@ function ensureCollectionStyles() {
       from { transform: perspective(500px) rotateY(0deg) scale(0.35); opacity: 0; }
       60% { transform: perspective(500px) rotateY(360deg) scale(1.14); opacity: 1; }
       to { transform: perspective(500px) rotateY(720deg) scale(1); opacity: 1; }
-    }
-    @keyframes collectionRotate {
-      from { transform: perspective(520px) rotateY(0deg) scale(1); }
-      50% { transform: perspective(520px) rotateY(180deg) scale(1.08); }
-      to { transform: perspective(520px) rotateY(360deg) scale(1); }
     }
   `;
   document.head.appendChild(style);
@@ -3140,27 +3120,6 @@ function setCollectionFilter(filter) {
   renderCollectionGrid();
 }
 
-function loadCollectionAssetMap() {
-  if (collectionAssetMap) {
-    return Promise.resolve(collectionAssetMap);
-  }
-
-  if (!collectionAssetMapPromise) {
-    collectionAssetMapPromise = fetch(COLLECTION_ASSET_MAP_PATH, { cache: "force-cache" })
-      .then((response) => response.json())
-      .then((data) => {
-        collectionAssetMap = new Map(data.items.map((item) => [item.id, item]));
-        return collectionAssetMap;
-      })
-      .catch(() => {
-        collectionAssetMap = new Map();
-        return collectionAssetMap;
-      });
-  }
-
-  return collectionAssetMapPromise;
-}
-
 function loadCollectionCatalog() {
   if (collectionCatalogMap) {
     return Promise.resolve(collectionCatalogMap);
@@ -3182,41 +3141,51 @@ function loadCollectionCatalog() {
   return collectionCatalogPromise;
 }
 
+function loadCollectionCharacterAssets() {
+  if (collectionCharacterAssetMap) {
+    return Promise.resolve(collectionCharacterAssetMap);
+  }
+
+  if (!collectionCharacterAssetPromise) {
+    collectionCharacterAssetPromise = fetch(COLLECTION_CHARACTER_ASSET_PATH, { cache: "force-cache" })
+      .then((response) => response.json())
+      .then((data) => {
+        collectionCharacterAssetMap = new Map(data.items.map((item) => [item.id, item]));
+        return collectionCharacterAssetMap;
+      })
+      .catch(() => {
+        collectionCharacterAssetMap = new Map();
+        return collectionCharacterAssetMap;
+      });
+  }
+
+  return collectionCharacterAssetPromise;
+}
+
 function getCollectionCatalogEntry(id) {
   return collectionCatalogMap?.get(id) || null;
+}
+
+function getCollectionCharacterAssetEntry(id) {
+  return collectionCharacterAssetMap?.get(id) || null;
 }
 
 function getCollectionName(id) {
   return getCollectionCatalogEntry(id)?.name || `No.${id}`;
 }
 
-function getCollectionLookupName(id) {
-  const entry = getCollectionCatalogEntry(id);
-  return entry?.lookupName || entry?.name || `Disney Tsum Tsum`;
-}
-
-function getFandomImageUrl(name) {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 2500);
-  const title = encodeURIComponent(name);
-  const params = `action=query&format=json&origin=*&prop=pageimages&piprop=thumbnail&pithumbsize=720&titles=${title}`;
-  return fetch(`https://disney.fandom.com/api.php?${params}`, { signal: controller.signal })
-    .then((response) => response.json())
-    .then((data) => {
-      const pages = data?.query?.pages ? Object.values(data.query.pages) : [];
-      return pages.find((page) => page?.thumbnail?.source)?.thumbnail.source || "";
-    })
-    .catch(() => "")
-    .finally(() => window.clearTimeout(timeout));
-}
-
-function createDetailImage(src, alt) {
+function createDetailImage(src, alt, fallbackSrc = "") {
   const image = document.createElement("img");
   image.src = src;
   image.alt = alt;
   image.loading = "lazy";
   image.decoding = "async";
   image.referrerPolicy = "no-referrer";
+  if (fallbackSrc && fallbackSrc !== src) {
+    image.addEventListener("error", () => {
+      image.src = fallbackSrc;
+    }, { once: true });
+  }
   return image;
 }
 
@@ -3300,7 +3269,7 @@ function createCollectionCard(id) {
   return card;
 }
 
-function showCollectionDetail(id) {
+async function showCollectionDetail(id) {
   if (!collectionOverlay || !unlockedSprites.has(id)) {
     return;
   }
@@ -3309,10 +3278,25 @@ function showCollectionDetail(id) {
     return;
   }
 
+  collectionDetailRenderToken += 1;
+  const token = collectionDetailRenderToken;
+  collectionDetailLayer.textContent = "";
+  const loading = document.createElement("div");
+  loading.className = "collection-empty";
+  loading.textContent = "加载图鉴原图...";
+  collectionDetailLayer.appendChild(loading);
+
+  await Promise.all([
+    loadCollectionCatalog(),
+    loadCollectionCharacterAssets(),
+  ]);
+  if (token !== collectionDetailRenderToken || !collectionDetailLayer || !collectionOverlay) {
+    return;
+  }
+
   collectionDetailLayer.textContent = "";
   const name = getCollectionName(id);
-  const lookupName = getCollectionLookupName(id);
-  const catalogEntry = getCollectionCatalogEntry(id);
+  const characterAsset = getCollectionCharacterAssetEntry(id);
   const card = document.createElement("section");
   card.className = "collection-detail-card";
   card.setAttribute("aria-label", `${name} 详情`);
@@ -3338,73 +3322,33 @@ function showCollectionDetail(id) {
   const closeups = document.createElement("div");
   closeups.className = "collection-closeups";
 
-  const rotator = document.createElement("div");
-  rotator.className = "collection-rotator";
-  body.append(original, closeups, rotator);
+  body.append(closeups, original);
 
-  const caption = document.createElement("div");
-  caption.className = "collection-detail-caption";
-  caption.textContent = catalogEntry?.resourceKey || `No.${id}`;
-
-  card.append(head, body, caption);
+  card.append(head, body);
   collectionDetailLayer.appendChild(card);
 
-  loadCollectionAssetMap().then(async () => {
-    if (!collectionDetailLayer || !collectionOverlay) {
-      return;
-    }
+  const avatarSrc = `assets/${id}.png`;
+  const characterSrc = characterAsset?.file || "";
+  const originalSrc = await resolveFirstAvailableImage([characterSrc, avatarSrc]);
+  if (token !== collectionDetailRenderToken || !collectionDetailLayer || !collectionOverlay) {
+    return;
+  }
 
-    const avatarSrc = `assets/${id}.png`;
-    const spriteSrc = catalogEntry?.sprite ? `sszdy_assets/${catalogEntry.sprite}` : avatarSrc;
-    const onlineImageSrc = await getFandomImageUrl(lookupName);
-    const originalSrc = onlineImageSrc || await resolveFirstAvailableImage([spriteSrc, avatarSrc]);
-    const textureSrc = await resolveFirstAvailableImage([
-      spriteSrc,
-      avatarSrc,
-    ]);
-    const closeupSources = [];
-    for (const src of [
-      spriteSrc,
-      avatarSrc,
-    ]) {
-      if (src && !closeupSources.includes(src) && await checkImageAvailable(src)) {
-        closeupSources.push(src);
-      }
-    }
+  closeups.textContent = "";
+  closeups.appendChild(createDetailImage(avatarSrc, `${name} 松松头像`, characterSrc));
 
-    original.textContent = "";
-    if (originalSrc) {
-      const image = createDetailImage(originalSrc, `${name} 经典角色图`);
-      if (onlineImageSrc) {
-        image.className = "collection-classic-image";
-      }
-      original.appendChild(image);
-    } else {
-      original.appendChild(createMissingAssetNote(`${name} 暂无可用图鉴资源`));
-    }
-
-    closeups.textContent = "";
-    if (closeupSources.length) {
-      closeupSources.slice(0, 3).forEach((src, index) => {
-        closeups.appendChild(createDetailImage(src, `${name} 松松形象 ${index + 1}`));
-      });
-    } else {
-      closeups.appendChild(createMissingAssetNote(`No.${id} 暂无特写资源`));
-    }
-
-    rotator.textContent = "";
-    if (textureSrc) {
-      rotator.appendChild(createDetailImage(textureSrc, `${name} 360°旋转展示`));
-    } else {
-      rotator.appendChild(createMissingAssetNote(`${name} 暂无旋转展示资源`));
-    }
-    caption.textContent = onlineImageSrc
-      ? `${catalogEntry?.resourceKey || `No.${id}`} / Disney Wiki: ${lookupName}`
-      : `${catalogEntry?.resourceKey || `No.${id}`} / 暂未取到在线角色图，当前显示原版解包松松形象`;
-  });
+  original.textContent = "";
+  if (originalSrc) {
+    const image = createDetailImage(originalSrc, `${name} 角色图`, avatarSrc);
+    image.className = "collection-classic-image";
+    original.appendChild(image);
+  } else {
+    original.appendChild(createMissingAssetNote(`${name} 暂无可用图鉴资源`));
+  }
 }
 
 function hideCollectionDetail() {
+  collectionDetailRenderToken += 1;
   if (collectionDetailLayer) {
     collectionDetailLayer.textContent = "";
     const empty = document.createElement("div");
@@ -3529,6 +3473,18 @@ function createGachaChestShell() {
   return shell;
 }
 
+function loadGachaChestFrameSources() {
+  if (!gachaChestFrameSourcesPromise) {
+    gachaChestFrameSourcesPromise = Promise
+      .all(GACHA_CHEST_FRAMES.map((frame) => {
+        const src = `sszdy_assets/Sprite_Sprite_${frame}.png`;
+        return checkImageAvailable(src).then((available) => available ? src : null);
+      }))
+      .then((sources) => sources.filter(Boolean));
+  }
+  return gachaChestFrameSourcesPromise;
+}
+
 async function runSingleGacha() {
   if (gachaAnimating) {
     return;
@@ -3565,7 +3521,7 @@ async function playGachaAnimation(resultId, isNew) {
   const inner = document.createElement("div");
   inner.className = "gacha-stage-inner";
   const chest = document.createElement("img");
-  chest.className = "gacha-chest loading";
+  chest.className = "gacha-chest";
   chest.alt = "抽卡宝箱";
   chest.src = `sszdy_assets/Sprite_Sprite_${GACHA_CHEST_FIRST_FRAME}.png`;
   const message = document.createElement("div");
@@ -3575,16 +3531,9 @@ async function playGachaAnimation(resultId, isNew) {
   gachaResultLayer.appendChild(inner);
   collectionOverlay.appendChild(gachaResultLayer);
 
-  const frameSources = [];
-  for (const frame of GACHA_CHEST_FRAMES) {
-    const src = `sszdy_assets/Sprite_Sprite_${frame}.png`;
-    if (await checkImageAvailable(src)) {
-      frameSources.push(src);
-    }
-  }
+  const frameSources = await loadGachaChestFrameSources();
 
   if (frameSources.length) {
-    chest.classList.remove("loading");
     const frameSequence = [
       ...frameSources,
       ...frameSources.slice(0, -1).reverse(),
