@@ -17,7 +17,7 @@ const WALL_THICKNESS = 34;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const HUD_TOP = 54;
-const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 72;
+const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 118;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
 const SPRINT_BEST_STORAGE_KEY = "laohu-tsumtsum-sprint-best-v1";
 const HERO_STORAGE_KEY = "laohu-tsumtsum-hero-v1";
@@ -31,13 +31,28 @@ const GACHA_CHEST_FRAMES = [
 ];
 const HERO_MAX_ENERGY = 100;
 const LEVELS_PER_PAGE = 10;
-const HERO_PANEL_Y = DESIGN_HEIGHT - 168;
+const HERO_PANEL_Y = DESIGN_HEIGHT - 130;
 
 const HEROES = [
   { id: "mickey", name: "米奇", assetId: 287, skillName: "星光竖线", skill: "vertical", description: "滑动选择一列，清除直线上的松松" },
   { id: "dumbo", name: "小飞象", assetId: 142, skillName: "横扫飞行", skill: "horizontal", description: "滑动选择一行，清除横线上的松松" },
   { id: "elsa", name: "艾莎", assetId: 246, skillName: "冰晶震波", skill: "shock", description: "全屏震动并清除少量松松" },
   { id: "stitch", name: "史迪奇", assetId: 179, skillName: "蓝色同伴", skill: "convert", description: "把部分松松变成当前英雄" },
+  { id: "minnie", name: "米妮", assetId: 288, skillName: "甜心横线", skill: "horizontal", description: "滑动选择一行，释放横向清除" },
+  { id: "donald", name: "唐老鸭", assetId: 289, skillName: "暴跳震波", skill: "shock", description: "滑动指定中心，震开并清除松松" },
+  { id: "daisy", name: "黛丝", assetId: 290, skillName: "花束转化", skill: "convert", description: "滑动指定区域，把松松变为同伴" },
+  { id: "goofy", name: "高飞", assetId: 291, skillName: "高飞竖线", skill: "vertical", description: "滑动选择一列，释放纵向清除" },
+];
+
+const BOSS_POOL = [
+  { name: "皮特", assetId: 292 },
+  { name: "乌苏拉", assetId: 334 },
+  { name: "贾方", assetId: 335 },
+  { name: "刀疤", assetId: 336 },
+  { name: "哈迪斯", assetId: 337 },
+  { name: "库伊拉", assetId: 338 },
+  { name: "盖斯顿", assetId: 339 },
+  { name: "熊抱哥", assetId: 340 },
 ];
 
 const LEVELS = [
@@ -223,6 +238,52 @@ LEVELS.slice(20).forEach((level, index) => {
   level.id = 21 + index;
 });
 
+function makeGeneratedLevel(id) {
+  const theme = EXTRA_LEVEL_THEMES[(id - 1) % EXTRA_LEVEL_THEMES.length];
+  const colors = theme.colors;
+  const bossLevel = id % 10 === 0;
+  const baseScore = 7200 + id * 360;
+  return {
+    id,
+    name: `第${id}关${bossLevel ? " · BOSS" : ""}`,
+    subtitle: bossLevel ? "反派松松来袭" : theme.subtitle,
+    duration: bossLevel ? 130 : Math.min(150, 82 + (id % 12) * 6),
+    goals: bossLevel
+      ? { score: Math.floor(baseScore * 0.72), boss: true }
+      : {
+        ...theme.goals,
+        score: Math.max(theme.goals.score || 0, baseScore),
+        clears: theme.goals.clears ? theme.goals.clears + Math.floor(id * 1.35) : undefined,
+        targetClears: theme.goals.targetClears ? theme.goals.targetClears + Math.floor(id * 0.65) : undefined,
+        combo: theme.goals.combo ? Math.min(14, theme.goals.combo + Math.floor(id / 18)) : undefined,
+        shockClears: theme.goals.shockClears ? theme.goals.shockClears + Math.floor(id / 20) : undefined,
+      },
+    targetLabel: !bossLevel && theme.goals.targetClears ? "目标" : undefined,
+    targetWeight: theme.targetWeight || 0.22,
+    boss: bossLevel ? {
+      ...BOSS_POOL[Math.floor(id / 10 - 1) % BOSS_POOL.length],
+      hp: 460 + id * 78,
+    } : null,
+    background: { top: colors[0], bottom: colors[1], accent: bossLevel ? 0xff4f5f : colors[2], glow: colors[3] },
+    obstacles: createExtraLevelObstacles(id + (bossLevel ? 2 : 0)),
+  };
+}
+
+for (let id = LEVELS.length + 1; id <= 60; id += 1) {
+  LEVELS.push(makeGeneratedLevel(id));
+}
+
+for (const level of LEVELS) {
+  if (!level.infinite && level.id % 10 === 0 && !level.boss) {
+    const boss = BOSS_POOL[Math.floor(level.id / 10 - 1) % BOSS_POOL.length];
+    level.name = `第${level.id}关 · BOSS`;
+    level.subtitle = "反派松松来袭";
+    level.goals = { score: Math.max(level.goals.score || 0, 3600 + level.id * 420), boss: true };
+    level.boss = { ...boss, hp: 460 + level.id * 78 };
+    level.background = { ...level.background, accent: 0xff4f5f };
+  }
+}
+
 
 const BOTTLE = {
   leftNeckTop: { x: 116, y: 94 },
@@ -329,6 +390,13 @@ let skillPreviewLine = null;
 let pendingHeroSkill = null;
 let pendingSkillPoint = null;
 let heroEnergy = 0;
+let bossContainer = null;
+let bossSprite = null;
+let bossHpBar = null;
+let bossHpText = null;
+let bossState = null;
+let pauseOverlay = null;
+let pausedByMenu = false;
 let levelStats = {
   targetClears: 0,
   clears: 0,
@@ -375,6 +443,9 @@ function loadProgress() {
   if (Number.isFinite(saved) && saved >= 1) {
     unlockedLevel = Math.min(LEVELS.length, saved);
   }
+  if (new URLSearchParams(window.location.search).has("unlockAll")) {
+    unlockedLevel = LEVELS.length;
+  }
 
   try {
     sprintBestScores = JSON.parse(window.localStorage.getItem(SPRINT_BEST_STORAGE_KEY) || "{}") || {};
@@ -388,6 +459,10 @@ function loadProgress() {
 
   const savedCoins = Number(window.localStorage.getItem(COINS_STORAGE_KEY));
   coins = Number.isFinite(savedCoins) && savedCoins > 0 ? Math.floor(savedCoins) : 0;
+  const testCoins = Number(new URLSearchParams(window.location.search).get("testCoins"));
+  if (Number.isFinite(testCoins) && testCoins > 0) {
+    coins = Math.floor(testCoins);
+  }
 
   try {
     const savedCollection = JSON.parse(window.localStorage.getItem(COLLECTION_STORAGE_KEY) || "[]");
@@ -471,6 +546,9 @@ function describeGoals(level) {
   if (level.goals.score) {
     goals.push(`${level.goals.score}分`);
   }
+  if (level.goals.boss) {
+    goals.push("击败BOSS");
+  }
   if (level.goals.targetClears) {
     goals.push(`${level.targetLabel || "目标"}松松x${level.goals.targetClears}`);
   }
@@ -497,6 +575,7 @@ function isLevelComplete() {
 
   const goals = currentLevel.goals;
   return (!goals.score || score >= goals.score)
+    && (!goals.boss || (bossState && bossState.hp <= 0))
     && (!goals.targetClears || levelStats.targetClears >= goals.targetClears)
     && (!goals.combo || levelStats.maxCombo >= goals.combo)
     && (!goals.clears || levelStats.clears >= goals.clears)
@@ -950,12 +1029,13 @@ function ensureCollectionStyles() {
     }
     .collection-detail-body {
       display: grid;
-      grid-template-columns: 108px 1fr;
+      grid-template-columns: 112px 1fr;
       gap: 12px;
       align-items: center;
     }
     .collection-sticker,
     .collection-closeup {
+      position: relative;
       display: grid;
       place-items: center;
       min-height: 120px;
@@ -970,10 +1050,23 @@ function ensureCollectionStyles() {
       object-fit: contain;
     }
     .collection-closeup img {
-      width: 160%;
-      height: 160%;
+      position: absolute;
+      width: 150%;
+      height: 150%;
       object-fit: contain;
       image-rendering: auto;
+      animation: collectionRotate 3.6s linear infinite;
+      transform-origin: center;
+    }
+    .collection-closeup img:nth-child(2) {
+      animation-delay: -1.2s;
+      transform: rotateY(120deg);
+      opacity: 0.72;
+    }
+    .collection-closeup img:nth-child(3) {
+      animation-delay: -2.4s;
+      transform: rotateY(240deg);
+      opacity: 0.72;
     }
     .collection-detail-caption {
       color: #ffeaa0;
@@ -1011,6 +1104,47 @@ function ensureCollectionStyles() {
       object-fit: contain;
       animation: gachaPulse 0.42s ease-in-out infinite alternate;
     }
+    .gacha-chest-shell {
+      position: relative;
+      width: 190px;
+      height: 166px;
+      display: grid;
+      place-items: end center;
+      animation: gachaPulse 0.42s ease-in-out infinite alternate;
+    }
+    .gacha-chest-shell::before,
+    .gacha-chest-shell::after {
+      content: "";
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      border: 4px solid rgba(255, 255, 255, 0.75);
+      box-shadow: 0 0 28px rgba(255, 214, 110, 0.55);
+    }
+    .gacha-chest-shell::before {
+      top: 8px;
+      height: 74px;
+      border-radius: 70px 70px 12px 12px;
+      background: linear-gradient(135deg, #ffdf74, #d55b44 54%, #7a3047);
+      transform-origin: 50% 100%;
+      animation: gachaLid 0.56s ease-in-out infinite alternate;
+    }
+    .gacha-chest-shell::after {
+      bottom: 0;
+      height: 92px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #7a3047, #d65a42 48%, #ffd66e);
+    }
+    .gacha-chest-lock {
+      position: relative;
+      z-index: 2;
+      width: 42px;
+      height: 34px;
+      margin-bottom: 42px;
+      border-radius: 7px;
+      background: #fff176;
+      box-shadow: 0 0 18px rgba(255, 241, 118, 0.85);
+    }
     .gacha-result {
       width: 230px;
       height: 230px;
@@ -1030,10 +1164,19 @@ function ensureCollectionStyles() {
       from { transform: scale(0.9) rotate(-8deg); }
       to { transform: scale(1.12) rotate(10deg); }
     }
+    @keyframes gachaLid {
+      from { transform: rotateX(0deg) translateY(0); }
+      to { transform: rotateX(46deg) translateY(-18px); }
+    }
     @keyframes gachaSpin {
       from { transform: perspective(500px) rotateY(0deg) scale(0.35); opacity: 0; }
       60% { transform: perspective(500px) rotateY(360deg) scale(1.14); opacity: 1; }
       to { transform: perspective(500px) rotateY(720deg) scale(1); opacity: 1; }
+    }
+    @keyframes collectionRotate {
+      from { transform: perspective(520px) rotateY(0deg) scale(1); }
+      50% { transform: perspective(520px) rotateY(180deg) scale(1.08); }
+      to { transform: perspective(520px) rotateY(360deg) scale(1); }
     }
   `;
   document.head.appendChild(style);
@@ -1693,6 +1836,15 @@ function drawSkillPreview(point) {
 
   skillPreviewLine.clear();
   const color = currentLevel?.background?.accent || 0xfff176;
+  if (pendingHeroSkill.skill === "shock" || pendingHeroSkill.skill === "convert") {
+    skillPreviewLine.beginFill(color, 0.16);
+    skillPreviewLine.drawCircle(point.x, point.y, pendingHeroSkill.skill === "shock" ? 120 : 92);
+    skillPreviewLine.endFill();
+    skillPreviewLine.lineStyle({ width: 6, color: 0xffffff, alpha: 0.82 });
+    skillPreviewLine.drawCircle(point.x, point.y, pendingHeroSkill.skill === "shock" ? 120 : 92);
+    return;
+  }
+
   skillPreviewLine.lineStyle({ width: 22, color, alpha: 0.32, cap: "round" });
   if (pendingHeroSkill.skill === "vertical") {
     skillPreviewLine.moveTo(point.x, 236);
@@ -1713,7 +1865,7 @@ function drawSkillPreview(point) {
 }
 
 function handlePointerDown(event) {
-  if (!gameStarted) {
+  if (!gameStarted || pausedByMenu) {
     return;
   }
 
@@ -1744,7 +1896,7 @@ function handlePointerDown(event) {
 }
 
 function handlePointerMove(event) {
-  if (!gameStarted) {
+  if (!gameStarted || pausedByMenu) {
     clearSelection();
     cancelPendingHeroSkill();
     isDragging = false;
@@ -1774,7 +1926,7 @@ function handlePointerMove(event) {
 }
 
 function handlePointerUp() {
-  if (!gameStarted) {
+  if (!gameStarted || pausedByMenu) {
     clearSelection();
     cancelPendingHeroSkill();
     isDragging = false;
@@ -1794,12 +1946,12 @@ function handlePointerUp() {
 
   isDragging = false;
   lastPointerPosition = null;
-  dragPointerPosition = null;
 
   if (selectedBalls.length >= 2) {
     playPopSound();
     explodeSelectedBalls();
   } else {
+    dragPointerPosition = null;
     clearSelection();
   }
 }
@@ -1938,6 +2090,8 @@ function explodeSelectedBalls() {
   const chain = [...selectedBalls];
   const chainLength = selectedBalls.length;
   const quakeCenter = getChainCenter(chain);
+  const bossHitPoint = dragPointerPosition || chain[chain.length - 1]?.body.position;
+  const hitBoss = isPointNearBoss(bossHitPoint);
   triggerHaptic([90, 50, 130]);
 
   for (const ball of chain) {
@@ -1947,6 +2101,9 @@ function explodeSelectedBalls() {
   removeBalls(chain);
   levelStats.maxCombo = Math.max(levelStats.maxCombo, chainLength);
   addHeroEnergy(10 + chainLength * 9);
+  if (hitBoss) {
+    applyBossDamage(36 + chainLength * 42, bossState.position);
+  }
   if (chainLength >= 5) {
     levelStats.shockClears += 1;
     triggerPhysicsQuake(quakeCenter, chainLength);
@@ -1970,7 +2127,7 @@ function startTargetedHeroSkill() {
   pendingSkillPoint = null;
   clearSelection();
   if (heroEnergyText) {
-    heroEnergyText.text = "在瓶中滑动选择位置";
+    heroEnergyText.text = "滑动选择区域，松手释放";
   }
   drawSkillPreview({ x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.58 });
 }
@@ -2035,11 +2192,42 @@ function executeTargetedHeroSkill(point) {
     animateSkillSweep("vertical", x, 0xfff176);
     const targets = balls.filter((ball) => Math.abs(ball.body.position.x - x) < 76);
     removeBalls(targets.slice(0, 20), 120);
+    if (bossState && Math.abs(bossState.position.x - x) < bossState.radius + 76) {
+      applyBossDamage(210, bossState.position);
+    }
   } else if (skill === "horizontal") {
     const y = Math.max(250, Math.min(BOTTOM_SAFE_Y, target.y));
     animateSkillSweep("horizontal", y, 0x9bf6ff);
     const targets = balls.filter((ball) => Math.abs(ball.body.position.y - y) < 76);
     removeBalls(targets.slice(0, 20), 120);
+    if (bossState && Math.abs(bossState.position.y - y) < bossState.radius + 76) {
+      applyBossDamage(210, bossState.position);
+    }
+  } else if (skill === "shock") {
+    animateSkillRing(target.x, target.y, 0xa7f2ff);
+    triggerPhysicsQuake(target, 9);
+    const targets = balls.filter((ball) => Math.hypot(ball.body.position.x - target.x, ball.body.position.y - target.y) < 148);
+    removeBalls(shuffle(targets).slice(0, 12), 130);
+    if (isPointNearBoss(target) || (bossState && Math.hypot(bossState.position.x - target.x, bossState.position.y - target.y) < 210)) {
+      applyBossDamage(260, bossState.position);
+    }
+  } else if (skill === "convert") {
+    animateSkillRing(target.x, target.y, 0x73f7cf);
+    const targets = shuffle(balls.filter((ball) => Math.hypot(ball.body.position.x - target.x, ball.body.position.y - target.y) < 132))
+      .slice(0, Math.min(14, balls.length));
+    for (const ball of targets) {
+      ball.spriteId = selectedHero.assetId;
+      ball.view.destroy({ children: true });
+      ball.view = makeCircularSprite(selectedHeroTexture, selectedHero.assetId === currentLevelTargetSpriteId);
+      ball.view.zIndex = 3;
+      app.stage.addChild(ball.view);
+      ball.view.position.set(ball.body.position.x, ball.body.position.y);
+      burstParticles(ball.body.position.x, ball.body.position.y);
+    }
+    triggerPhysicsQuake(target, 5);
+    if (isPointNearBoss(target)) {
+      applyBossDamage(150, bossState.position);
+    }
   }
 
   cancelPendingHeroSkill();
@@ -2054,36 +2242,7 @@ function useHeroSkill() {
     return;
   }
 
-  if (selectedHero.skill === "vertical" || selectedHero.skill === "horizontal") {
-    startTargetedHeroSkill();
-    return;
-  }
-
-  spendHeroSkillEnergy();
-
-  if (selectedHero.skill === "shock") {
-    animateSkillRing(DESIGN_WIDTH / 2, DESIGN_HEIGHT * 0.58, 0xa7f2ff);
-    triggerPhysicsQuake({ x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.58 }, 9);
-    removeBalls(shuffle(balls).slice(0, 8), 130);
-  } else if (selectedHero.skill === "convert") {
-    animateSkillRing(DESIGN_WIDTH / 2, DESIGN_HEIGHT * 0.62, 0x73f7cf);
-    const targets = shuffle(balls).slice(0, Math.min(14, balls.length));
-    for (const ball of targets) {
-      ball.spriteId = selectedHero.assetId;
-      ball.view.destroy({ children: true });
-      ball.view = makeCircularSprite(selectedHeroTexture, selectedHero.assetId === currentLevelTargetSpriteId);
-      ball.view.zIndex = 3;
-      app.stage.addChild(ball.view);
-      ball.view.position.set(ball.body.position.x, ball.body.position.y);
-      burstParticles(ball.body.position.x, ball.body.position.y);
-    }
-    triggerPhysicsQuake({ x: DESIGN_WIDTH / 2, y: DESIGN_HEIGHT * 0.62 }, 5);
-  }
-
-  updateHeroUi();
-  if (isLevelComplete()) {
-    finishLevel(true);
-  }
+  startTargetedHeroSkill();
 }
 
 function updateParticles() {
@@ -2167,6 +2326,7 @@ function setupAudio() {
 }
 
 function syncSprites() {
+  const now = performance.now();
   for (const ball of balls) {
     if (isOutsideBottleSafetyZone(ball.body)) {
       returnEscapedBall(ball.body);
@@ -2177,6 +2337,11 @@ function syncSprites() {
 
   if (isDragging) {
     redrawConnectionLine();
+  }
+  if (bossContainer && bossState) {
+    bossContainer.y = bossState.position.y + Math.sin(now / 460) * 5;
+    const pulse = 1 + Math.sin(now / 260) * 0.025;
+    bossContainer.scale.set(pulse);
   }
 }
 
@@ -2290,18 +2455,133 @@ function createLevelObstacles() {
   }
 }
 
+function clearBoss() {
+  if (bossContainer) {
+    bossContainer.destroy({ children: true });
+    bossContainer = null;
+  }
+  bossSprite = null;
+  bossHpBar = null;
+  bossHpText = null;
+  bossState = null;
+}
+
+async function setupBossForLevel() {
+  clearBoss();
+  if (!currentLevel?.boss) {
+    return;
+  }
+
+  const boss = currentLevel.boss;
+  bossState = {
+    name: boss.name,
+    hp: boss.hp,
+    maxHp: boss.hp,
+    position: { x: DESIGN_WIDTH / 2, y: 318 },
+    radius: 78,
+  };
+
+  bossContainer = new PIXI.Container();
+  bossContainer.zIndex = 12;
+  const aura = new PIXI.Graphics();
+  aura.beginFill(0xff253f, 0.2);
+  aura.drawCircle(0, 0, 106);
+  aura.endFill();
+  aura.lineStyle(8, 0xff4f5f, 0.34);
+  aura.drawCircle(0, 0, 96);
+  bossContainer.addChild(aura);
+
+  let texture = PIXI.Texture.WHITE;
+  if (PIXI.Assets && PIXI.Assets.load) {
+    texture = await PIXI.Assets.load(`assets/${boss.assetId}.png`).catch(() => PIXI.Texture.WHITE);
+  }
+  bossSprite = new PIXI.Sprite(texture);
+  bossSprite.anchor.set(0.5);
+  bossSprite.width = 156;
+  bossSprite.height = 156;
+  bossSprite.tint = 0xff5a5f;
+  bossContainer.addChild(bossSprite);
+
+  bossHpBar = new PIXI.Graphics();
+  bossContainer.addChild(bossHpBar);
+  bossHpText = new PIXI.Text("", {
+    fill: 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 13,
+    fontWeight: "800",
+    align: "center",
+  });
+  bossHpText.anchor.set(0.5, 0.5);
+  bossHpText.position.set(0, -96);
+  bossContainer.addChild(bossHpText);
+
+  bossContainer.position.set(bossState.position.x, bossState.position.y);
+  app.stage.addChild(bossContainer);
+  updateBossUi();
+}
+
+function updateBossUi() {
+  if (!bossState || !bossHpBar || !bossHpText) {
+    return;
+  }
+
+  const ratio = Math.max(0, Math.min(1, bossState.hp / bossState.maxHp));
+  bossHpBar.clear();
+  bossHpBar.beginFill(0x13070a, 0.9);
+  bossHpBar.drawRoundedRect(-86, -116, 172, 16, 8);
+  bossHpBar.endFill();
+  bossHpBar.beginFill(ratio > 0.35 ? 0xff4f5f : 0xffd66e, 0.98);
+  bossHpBar.drawRoundedRect(-84, -114, 168 * ratio, 12, 6);
+  bossHpBar.endFill();
+  bossHpText.text = `${bossState.name}  ${Math.max(0, Math.ceil(bossState.hp))}/${bossState.maxHp}`;
+}
+
+function isPointNearBoss(point) {
+  if (!bossState || !point) {
+    return false;
+  }
+  return Math.hypot(point.x - bossState.position.x, point.y - bossState.position.y) <= bossState.radius + BALL_RADIUS * 0.9;
+}
+
+function applyBossDamage(amount, origin = bossState?.position) {
+  if (!bossState || amount <= 0 || bossState.hp <= 0) {
+    return 0;
+  }
+
+  const damage = Math.min(bossState.hp, Math.floor(amount));
+  bossState.hp -= damage;
+  score += damage * 10;
+  updateBossUi();
+  updateScoreText();
+  updateGoalText();
+  if (origin) {
+    burstParticles(origin.x, origin.y);
+  }
+  if (bossSprite) {
+    bossSprite.tint = bossState.hp <= 0 ? 0xffffff : 0xff3038;
+  }
+  triggerVisualShake(16, 9);
+  if (bossState.hp <= 0 && bossContainer) {
+    bossContainer.alpha = 0.45;
+  }
+  return damage;
+}
+
 async function startLevel(level) {
   gameStarted = false;
   currentLevel = level;
   currentLevelTargetSpriteId = null;
   levelTimeLeftMs = Number.isFinite(level.duration) ? level.duration * 1000 : Infinity;
   levelEndReason = "";
+  pausedByMenu = false;
+  hidePauseMenu();
   levelStats = { targetClears: 0, clears: 0, maxCombo: 0, shockClears: 0 };
   heroEnergy = 0;
   spawnTimer = 0;
   clearBalls();
   clearParticles();
   clearLevelObstacles();
+  clearBoss();
   score = 0;
   updateScoreText();
   updateGoalText();
@@ -2309,6 +2589,7 @@ async function startLevel(level) {
   createLevelObstacles();
   await Promise.all([loadRoundTextures(), loadHeroTexture()]);
   currentLevelTargetSpriteId = level.goals.targetClears ? selectedSpriteIds[0] : null;
+  await setupBossForLevel();
   hideLevelSelect();
   hideResultOverlay();
   updateHudForLevel();
@@ -2321,6 +2602,56 @@ async function restartGame() {
     return;
   }
   await startLevel(currentLevel);
+}
+
+function hidePauseMenu() {
+  if (pauseOverlay) {
+    pauseOverlay.destroy({ children: true });
+    pauseOverlay = null;
+  }
+  pausedByMenu = false;
+}
+
+function showPauseMenu() {
+  if (!currentLevel || pauseOverlay) {
+    return;
+  }
+  pausedByMenu = true;
+  clearSelection();
+  cancelPendingHeroSkill();
+
+  pauseOverlay = new PIXI.Container();
+  pauseOverlay.zIndex = 88;
+  const shade = new PIXI.Graphics();
+  shade.beginFill(0x061018, 0.72);
+  shade.drawRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+  shade.endFill();
+  shade.eventMode = "static";
+  pauseOverlay.addChild(shade);
+
+  const panel = new PIXI.Graphics();
+  panel.beginFill(0x111923, 0.97);
+  panel.lineStyle(2, 0xffd66e, 0.55);
+  panel.drawRoundedRect(44, 294, DESIGN_WIDTH - 88, 300, 8);
+  panel.endFill();
+  pauseOverlay.addChild(panel);
+
+  const title = new PIXI.Text("暂停", {
+    fill: 0xfff176,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 32,
+    fontWeight: "800",
+  });
+  title.anchor.set(0.5, 0);
+  title.position.set(DESIGN_WIDTH / 2, 326);
+  pauseOverlay.addChild(title);
+
+  const resume = createButton("继续", 78, 392, 120, 48, hidePauseMenu, { fill: 0x2d5f58, line: 0x73f7cf });
+  const retry = createButton("重试", 232, 392, 120, 48, () => restartGame().catch(showFatalError), { fill: 0x27313d, line: 0x9fd6ff });
+  const levels = createButton("选择关卡", 78, 470, 120, 48, showLevelSelect, { fill: 0x27313d, line: 0x9fd6ff, fontSize: 14 });
+  const home = createButton("返回首页", 232, 470, 120, 48, showLevelSelect, { fill: 0x7a3047, line: 0xffd66e, fontSize: 14 });
+  pauseOverlay.addChild(resume, retry, levels, home);
+  app.stage.addChild(pauseOverlay);
 }
 
 function createHud() {
@@ -2415,6 +2746,20 @@ function createHud() {
   levels.on("pointertap", showLevelSelect);
   app.stage.addChild(levels);
 
+  const pause = new PIXI.Text("Ⅱ", {
+    fill: 0xffffff,
+    fontFamily: "Arial, Microsoft YaHei, sans-serif",
+    fontSize: 18,
+    fontWeight: "900",
+  });
+  pause.anchor.set(1, 0);
+  pause.position.set(DESIGN_WIDTH - 94, HUD_TOP + 18);
+  pause.eventMode = "static";
+  pause.cursor = "pointer";
+  pause.zIndex = 21;
+  pause.on("pointertap", showPauseMenu);
+  app.stage.addChild(pause);
+
   coinsText = new PIXI.Text("", {
     fill: 0xfff176,
     fontFamily: "Arial, Microsoft YaHei, sans-serif",
@@ -2422,7 +2767,7 @@ function createHud() {
     fontWeight: "800",
   });
   coinsText.anchor.set(1, 0);
-  coinsText.position.set(DESIGN_WIDTH - 34, HUD_TOP - 23);
+  coinsText.position.set(DESIGN_WIDTH - 130, HUD_TOP + 3);
   coinsText.zIndex = 86;
   app.stage.addChild(coinsText);
 
@@ -2447,15 +2792,18 @@ function createHeroUi() {
   const pad = new PIXI.Graphics();
   pad.beginFill(0x071018, 0.58);
   pad.lineStyle(2, 0xffffff, 0.16);
-  pad.drawRoundedRect(24, HERO_PANEL_Y, DESIGN_WIDTH - 48, 118, 8);
+  pad.drawRoundedRect(24, HERO_PANEL_Y, DESIGN_WIDTH - 48, 82, 8);
   pad.endFill();
   heroContainer.addChild(pad);
 
   heroSprite = new PIXI.Sprite(PIXI.Texture.WHITE);
   heroSprite.anchor.set(0.5);
-  heroSprite.width = 96;
-  heroSprite.height = 96;
-  heroSprite.position.set(78, HERO_PANEL_Y + 60);
+  heroSprite.width = 64;
+  heroSprite.height = 64;
+  heroSprite.position.set(76, HERO_PANEL_Y + 41);
+  heroSprite.eventMode = "static";
+  heroSprite.cursor = "pointer";
+  heroSprite.on("pointertap", useHeroSkill);
   heroContainer.addChild(heroSprite);
 
   heroSkillLabel = new PIXI.Text("", {
@@ -2464,7 +2812,7 @@ function createHeroUi() {
     fontSize: 16,
     fontWeight: "800",
   });
-  heroSkillLabel.position.set(134, HERO_PANEL_Y + 18);
+  heroSkillLabel.position.set(120, HERO_PANEL_Y + 18);
   heroContainer.addChild(heroSkillLabel);
 
   heroSkillDesc = new PIXI.Text("", {
@@ -2473,14 +2821,14 @@ function createHeroUi() {
     fontSize: 12,
     fontWeight: "700",
     wordWrap: true,
-    wordWrapWidth: 154,
+    wordWrapWidth: 220,
   });
-  heroSkillDesc.position.set(134, HERO_PANEL_Y + 42);
+  heroSkillDesc.position.set(120, HERO_PANEL_Y + 42);
   heroContainer.addChild(heroSkillDesc);
 
   const energyTrack = new PIXI.Graphics();
   energyTrack.beginFill(0x111820, 0.88);
-  energyTrack.drawRoundedRect(134, HERO_PANEL_Y + 82, 150, 14, 7);
+  energyTrack.drawRoundedRect(120, HERO_PANEL_Y + 66, 250, 12, 6);
   energyTrack.endFill();
   heroContainer.addChild(energyTrack);
 
@@ -2493,15 +2841,10 @@ function createHeroUi() {
     fontSize: 12,
     fontWeight: "800",
   });
-  heroEnergyText.position.set(134, HERO_PANEL_Y + 100);
+  heroEnergyText.position.set(306, HERO_PANEL_Y + 42);
   heroContainer.addChild(heroEnergyText);
 
-  heroSkillButton = createButton("技能", 306, HERO_PANEL_Y + 38, 78, 48, useHeroSkill, {
-    fill: 0x2d5f58,
-    line: 0x73f7cf,
-    fontSize: 15,
-  });
-  heroContainer.addChild(heroSkillButton);
+  heroSkillButton = null;
   app.stage.addChild(heroContainer);
   updateHeroUi();
 }
@@ -2513,6 +2856,8 @@ function updateHeroUi() {
 
   if (heroSprite && selectedHeroTexture) {
     heroSprite.texture = selectedHeroTexture;
+    heroSprite.width = 64;
+    heroSprite.height = 64;
   }
 
   if (heroSkillLabel) {
@@ -2526,20 +2871,11 @@ function updateHeroUi() {
   if (heroEnergyBar) {
     heroEnergyBar.clear();
     heroEnergyBar.beginFill(ratio >= 1 ? 0xfff176 : 0x73f7cf, 0.95);
-    heroEnergyBar.drawRoundedRect(134, HERO_PANEL_Y + 82, 150 * ratio, 14, 7);
+    heroEnergyBar.drawRoundedRect(120, HERO_PANEL_Y + 66, 250 * ratio, 12, 6);
     heroEnergyBar.endFill();
   }
   if (heroEnergyText) {
-    heroEnergyText.text = ratio >= 1 ? "能量已满" : `能量 ${Math.floor(heroEnergy)}/${HERO_MAX_ENERGY}`;
-  }
-  if (heroSkillButton) {
-    heroSkillButton.alpha = ratio >= 1 ? 1 : 0.5;
-    setButtonStyle(heroSkillButton, {
-      fill: ratio >= 1 ? 0xffd66e : 0x2d5f58,
-      line: ratio >= 1 ? 0xffffff : 0x73f7cf,
-      lineAlpha: ratio >= 1 ? 0.95 : 0.5,
-      textFill: ratio >= 1 ? 0x111820 : 0xffffff,
-    });
+    heroEnergyText.text = ratio >= 1 ? "READY" : `${Math.floor(heroEnergy)}/${HERO_MAX_ENERGY}`;
   }
 }
 
@@ -2573,6 +2909,9 @@ function updateGoalText() {
   const parts = [];
   if (goals.score) {
     parts.push(`分数 ${score}/${goals.score}`);
+  }
+  if (goals.boss && bossState) {
+    parts.push(`BOSS ${Math.max(0, bossState.hp)}/${bossState.maxHp}`);
   }
   if (goals.targetClears) {
     parts.push(`${currentLevel.targetLabel || "目标"} ${levelStats.targetClears}/${goals.targetClears}`);
@@ -2801,15 +3140,17 @@ function showCollectionDetail(id) {
 
   const closeup = document.createElement("div");
   closeup.className = "collection-closeup";
-  const closeupImage = document.createElement("img");
-  closeupImage.src = `assets/${id}.png`;
-  closeupImage.alt = `No.${id} 放大预览`;
-  closeup.appendChild(closeupImage);
+  for (const label of ["正面", "侧面", "背面"]) {
+    const closeupImage = document.createElement("img");
+    closeupImage.src = `assets/${id}.png`;
+    closeupImage.alt = `No.${id} ${label}特写`;
+    closeup.appendChild(closeupImage);
+  }
   body.append(sticker, closeup);
 
   const caption = document.createElement("div");
   caption.className = "collection-detail-caption";
-  caption.textContent = "贴纸 / 放大预览";
+  caption.textContent = "原图贴纸 / 多视角特写包 / 360°旋转展示";
 
   card.append(head, body, caption);
   collectionDetailLayer.appendChild(card);
@@ -2958,6 +3299,14 @@ async function playGachaAnimation(resultId, isNew) {
   const chest = document.createElement("img");
   chest.className = "gacha-chest";
   chest.alt = "抽卡宝箱";
+  chest.onerror = () => {
+    const shell = document.createElement("div");
+    shell.className = "gacha-chest-shell";
+    const lock = document.createElement("div");
+    lock.className = "gacha-chest-lock";
+    shell.appendChild(lock);
+    chest.replaceWith(shell);
+  };
   const message = document.createElement("div");
   message.className = "gacha-result-text";
   message.textContent = "宝箱开启中...";
@@ -3017,6 +3366,7 @@ function showLevelSelect() {
   clearSelection();
   cancelPendingHeroSkill();
   hideResultOverlay();
+  hidePauseMenu();
 
   if (levelSelectContainer) {
     levelSelectContainer.destroy({ children: true });
@@ -3128,7 +3478,7 @@ function showLevelSelect() {
   const heroPanel = new PIXI.Graphics();
   heroPanel.beginFill(0x071018, 0.92);
   heroPanel.lineStyle(2, 0xfff176, 0.18);
-  heroPanel.drawRoundedRect(24, 630, DESIGN_WIDTH - 48, 196, 8);
+  heroPanel.drawRoundedRect(24, 630, DESIGN_WIDTH - 48, 232, 8);
   heroPanel.endFill();
   levelSelectContainer.addChild(heroPanel);
 
@@ -3143,20 +3493,23 @@ function showLevelSelect() {
 
   HEROES.forEach((hero, index) => {
     const selected = hero.id === selectedHeroId;
-    const x = 34 + index * 94;
+    const col = index % 4;
+    const row = Math.floor(index / 4);
+    const x = 34 + col * 94;
+    const y = 672 + row * 76;
     const button = new PIXI.Container();
     const bg = new PIXI.Graphics();
     bg.beginFill(selected ? 0x2d5f58 : 0x17202a, 0.9);
     bg.lineStyle(2, selected ? 0x73f7cf : 0xffffff, selected ? 0.85 : 0.18);
-    bg.drawRoundedRect(0, 0, 82, 88, 8);
+    bg.drawRoundedRect(0, 0, 82, 70, 8);
     bg.endFill();
     button.addChild(bg);
 
     const avatar = new PIXI.Sprite(heroTextures.get(hero.id) || PIXI.Texture.WHITE);
     avatar.anchor.set(0.5);
-    avatar.width = 52;
-    avatar.height = 52;
-    avatar.position.set(41, 32);
+    avatar.width = 44;
+    avatar.height = 44;
+    avatar.position.set(41, 26);
     button.addChild(avatar);
 
     const label = new PIXI.Text(hero.name, {
@@ -3167,10 +3520,10 @@ function showLevelSelect() {
       align: "center",
     });
     label.anchor.set(0.5, 0);
-    label.position.set(41, 62);
+    label.position.set(41, 50);
     button.addChild(label);
 
-    button.position.set(x, 672);
+    button.position.set(x, y);
     button.eventMode = "static";
     button.cursor = "pointer";
     button.on("pointerdown", (event) => event.stopPropagation());
@@ -3195,7 +3548,7 @@ function showLevelSelect() {
     wordWrap: true,
     wordWrapWidth: DESIGN_WIDTH - 68,
   });
-  heroDesc.position.set(34, 770);
+  heroDesc.position.set(34, 824);
   levelSelectContainer.addChild(heroDesc);
 
   app.stage.addChild(levelSelectContainer);
@@ -3262,9 +3615,9 @@ function showResultOverlay(passed) {
   }, { fill: 0x27313d, line: 0x9fd6ff });
   resultOverlay.addChild(retry);
 
-  const nextLabel = passed && currentLevel?.id < 20 ? "下一关" : "关卡";
+  const nextLabel = passed && currentLevel?.id < LEVELS.length ? "下一关" : "关卡";
   const next = createButton(nextLabel, 232, 444, 132, 52, () => {
-    if (passed && currentLevel?.id < 20) {
+    if (passed && currentLevel?.id < LEVELS.length) {
       startLevel(LEVELS[currentLevel.id]).catch(showFatalError);
       return;
     }
@@ -3318,7 +3671,7 @@ function startTicker() {
     const delta = lastTimestamp === 0 ? 0 : now - lastTimestamp;
     lastTimestamp = now;
 
-    if (gameStarted) {
+    if (gameStarted && !pausedByMenu) {
       if (Number.isFinite(levelTimeLeftMs)) {
         levelTimeLeftMs -= delta;
       }
@@ -3338,11 +3691,15 @@ function startTicker() {
     }
 
     updateParticles();
-    if (heroSkillButton && heroEnergy >= HERO_MAX_ENERGY && gameStarted) {
+    if (heroSprite && heroEnergy >= HERO_MAX_ENERGY && gameStarted && !pausedByMenu) {
       const pulse = 1 + Math.sin(now / 160) * 0.055;
-      heroSkillButton.scale.set(pulse);
-    } else if (heroSkillButton) {
-      heroSkillButton.scale.set(1);
+      heroSprite.width = 64 * pulse;
+      heroSprite.height = 64 * pulse;
+      heroSprite.tint = Math.sin(now / 120) > 0 ? 0xfff176 : 0xffffff;
+    } else if (heroSprite) {
+      heroSprite.width = 64;
+      heroSprite.height = 64;
+      heroSprite.tint = 0xffffff;
     }
     updateFeedbackShake();
   });
@@ -3355,6 +3712,25 @@ function showFatalError(error) {
     loadingEl.textContent = error instanceof Error ? error.message : String(error);
   }
 }
+
+window.__tsumDebug = {
+  levels: () => LEVELS.map((level) => ({ id: level.id, name: level.name, boss: Boolean(level.boss), infinite: Boolean(level.infinite) })),
+  heroes: () => HEROES.map((hero) => ({ id: hero.id, name: hero.name, assetId: hero.assetId, skill: hero.skill })),
+  startLevelById: (id) => {
+    const level = LEVELS.find((item) => item.id === id);
+    if (level) {
+      startLevel(level).catch(showFatalError);
+    }
+  },
+  state: () => ({
+    currentLevelId: currentLevel?.id || null,
+    currentLevelName: currentLevel?.name || null,
+    boss: bossState ? { hp: bossState.hp, maxHp: bossState.maxHp, name: bossState.name } : null,
+    heroEnergy,
+    score,
+    balls: balls.length,
+  }),
+};
 
 async function main() {
   loadProgress();
