@@ -32,19 +32,19 @@ const COLLECTION_STORAGE_KEY = "laohu-tsumtsum-collection-v1";
 const GACHA_COST = 100;
 const DUPLICATE_REFUND = 12;
 const GACHA_BALL_FRAME_PATHS = [
-  "sszdy_assets/Sprite_Sprite_69871.png",
-  "sszdy_assets/Texture2D_Texture2D_69802.png",
-  "sszdy_assets/Sprite_Sprite_70061.png",
-  "sszdy_assets/Texture2D_Texture2D_70000.png",
-  "sszdy_assets/Texture2D_Texture2D_69904.png",
-  "sszdy_assets/Texture2D_Texture2D_69838.png",
-  "sszdy_assets/Texture2D_Texture2D_69887.png",
-  "sszdy_assets/Sprite_Sprite_69882.png",
-  "sszdy_assets/Sprite_Sprite_69965.png",
-  "sszdy_assets/Texture2D_Texture2D_69844.png",
-  "sszdy_assets/Texture2D_Texture2D_69810.png",
-  "sszdy_assets/Sprite_Sprite_69967.png",
-  "sszdy_assets/Texture2D_Texture2D_69921.png",
+  "sszdy_assets/Sprite_Sprite_69871.png?v=55",
+  "sszdy_assets/Texture2D_Texture2D_69802.png?v=55",
+  "sszdy_assets/Sprite_Sprite_70061.png?v=55",
+  "sszdy_assets/Texture2D_Texture2D_70000.png?v=55",
+  "sszdy_assets/Texture2D_Texture2D_69904.png?v=55",
+  "sszdy_assets/Texture2D_Texture2D_69838.png?v=55",
+  "sszdy_assets/Texture2D_Texture2D_69887.png?v=55",
+  "sszdy_assets/Sprite_Sprite_69882.png?v=55",
+  "sszdy_assets/Sprite_Sprite_69965.png?v=55",
+  "sszdy_assets/Texture2D_Texture2D_69844.png?v=55",
+  "sszdy_assets/Texture2D_Texture2D_69810.png?v=55",
+  "sszdy_assets/Sprite_Sprite_69967.png?v=55",
+  "sszdy_assets/Texture2D_Texture2D_69921.png?v=55",
 ];
 const HERO_MAX_ENERGY = 100;
 const LEVELS_PER_PAGE = 10;
@@ -1286,19 +1286,13 @@ function ensureCollectionStyles() {
       filter: drop-shadow(0 24px 28px rgba(0, 0, 0, 0.48));
       animation: gachaPulse 0.28s ease-in-out infinite alternate;
     }
-    .gacha-ball-frame {
+    .gacha-ball-canvas {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      display: block;
       transform-origin: 50% 58%;
-      opacity: 0;
-      transition: opacity 0.045s linear;
-      will-change: opacity;
-    }
-    .gacha-ball-frame.is-active {
-      opacity: 1;
     }
     .gacha-ball-flare {
       position: absolute;
@@ -3999,13 +3993,14 @@ function preloadGachaFrames() {
   if (!gachaFrameImagesPromise) {
     gachaFrameImagesPromise = Promise.all(GACHA_BALL_FRAME_PATHS.map((path) => (
       loadImage(path)
-        .then((image) => ({ src: image.currentSrc || image.src || path }))
+        .then((image) => ({ image, src: image.currentSrc || image.src || path }))
         .catch(() => null)
     ))).then((results) => {
       const loadedFrames = results.filter(Boolean);
-      return loadedFrames.length
-        ? loadedFrames
-        : GACHA_BALL_FRAME_PATHS.map((path) => ({ src: path }));
+      if (!loadedFrames.length) {
+        throw new Error("No gacha ball frames loaded.");
+      }
+      return loadedFrames;
     });
   }
   return gachaFrameImagesPromise;
@@ -4017,26 +4012,35 @@ function createGachaBallShell(frameImages) {
   const glow = document.createElement("div");
   glow.className = "gacha-ball-flare";
   shell.appendChild(glow);
-  const frameNodes = frameImages.map((loadedImage, index) => {
-    const frame = document.createElement("img");
-    frame.className = `gacha-ball-frame${index === 0 ? " is-active" : ""}`;
-    frame.src = loadedImage.src || loadedImage.currentSrc || GACHA_BALL_FRAME_PATHS[index];
-    frame.alt = "彩球";
-    frame.draggable = false;
-    frame.addEventListener("error", () => {
-      frame.remove();
-      shell._frameNodes = (shell._frameNodes || []).filter((node) => node !== frame);
-      if (!shell._frameNodes.some((node) => node.classList.contains("is-active"))) {
-        shell._frameNodes[0]?.classList.add("is-active");
-        shell._activeFrameIndex = 0;
-      }
-    }, { once: true });
-    shell.appendChild(frame);
-    return frame;
-  });
-  shell._frameNodes = frameNodes;
+  const canvas = document.createElement("canvas");
+  canvas.className = "gacha-ball-canvas";
+  canvas.width = 256;
+  canvas.height = 256;
+  canvas.setAttribute("role", "img");
+  canvas.setAttribute("aria-label", "抽卡彩球");
+  shell.appendChild(canvas);
+  shell._frameImages = frameImages.map((frame) => frame.image).filter(Boolean);
+  shell._frameCanvas = canvas;
+  shell._frameContext = canvas.getContext("2d");
   shell._activeFrameIndex = 0;
+  drawGachaBallFrame(shell, 0);
   return shell;
+}
+
+function drawGachaBallFrame(shell, frameIndex) {
+  const frames = shell._frameImages || [];
+  const canvas = shell._frameCanvas;
+  const context = shell._frameContext;
+  if (!frames.length || !canvas || !context) {
+    return;
+  }
+
+  const image = frames[frameIndex % frames.length];
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  const ratio = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+  const width = image.naturalWidth * ratio;
+  const height = image.naturalHeight * ratio;
+  context.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
 }
 
 async function runSingleGacha() {
@@ -4104,21 +4108,20 @@ async function playGachaAnimation(resultId, isNew) {
   let lastFrameTime = 0;
   let frameRequest = 0;
   const stepFrames = (timestamp) => {
-    const frameNodes = ballReel._frameNodes || [];
-    if (!frameNodes.length || !gachaResultLayer) {
+    const frameImages = ballReel._frameImages || [];
+    if (!frameImages.length || !gachaResultLayer) {
       return;
     }
-    if (frameIndex >= frameNodes.length) {
+    if (frameIndex >= frameImages.length) {
       frameIndex = 0;
       frameDirection = 1;
     }
     if (!lastFrameTime || timestamp - lastFrameTime >= 58) {
-      frameNodes[frameIndex]?.classList.remove("is-active");
       frameIndex += frameDirection;
-      if (frameIndex >= frameNodes.length - 1 || frameIndex <= 0) {
+      if (frameIndex >= frameImages.length - 1 || frameIndex <= 0) {
         frameDirection *= -1;
       }
-      frameNodes[frameIndex]?.classList.add("is-active");
+      drawGachaBallFrame(ballReel, frameIndex);
       ballReel._activeFrameIndex = frameIndex;
       lastFrameTime = timestamp;
     }
@@ -4127,7 +4130,7 @@ async function playGachaAnimation(resultId, isNew) {
   frameRequest = window.requestAnimationFrame(stepFrames);
 
   try {
-    await delay(1180);
+    await delay(1700);
     if (!gachaResultLayer) {
       return;
     }

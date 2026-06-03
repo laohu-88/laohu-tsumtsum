@@ -1,9 +1,9 @@
-const CACHE_NAME = "laohu-tsumtsum-v53";
+const CACHE_NAME = "laohu-tsumtsum-v55";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./game.js",
-  "./game.js?v=53",
+  "./game.js?v=55",
   "./character-alignments.json",
   "./manifest.json",
   "./manifest.json?v=45",
@@ -23,19 +23,19 @@ const CORE_ASSETS = [
   "./icons/icon-192.png?v=45",
   "./icons/icon-512.png",
   "./icons/icon-512.png?v=45",
-  "./sszdy_assets/Sprite_Sprite_69871.png",
-  "./sszdy_assets/Texture2D_Texture2D_69802.png",
-  "./sszdy_assets/Sprite_Sprite_70061.png",
-  "./sszdy_assets/Texture2D_Texture2D_70000.png",
-  "./sszdy_assets/Texture2D_Texture2D_69904.png",
-  "./sszdy_assets/Texture2D_Texture2D_69838.png",
-  "./sszdy_assets/Texture2D_Texture2D_69887.png",
-  "./sszdy_assets/Sprite_Sprite_69882.png",
-  "./sszdy_assets/Sprite_Sprite_69965.png",
-  "./sszdy_assets/Texture2D_Texture2D_69844.png",
-  "./sszdy_assets/Texture2D_Texture2D_69810.png",
-  "./sszdy_assets/Sprite_Sprite_69967.png",
-  "./sszdy_assets/Texture2D_Texture2D_69921.png",
+  "./sszdy_assets/Sprite_Sprite_69871.png?v=55",
+  "./sszdy_assets/Texture2D_Texture2D_69802.png?v=55",
+  "./sszdy_assets/Sprite_Sprite_70061.png?v=55",
+  "./sszdy_assets/Texture2D_Texture2D_70000.png?v=55",
+  "./sszdy_assets/Texture2D_Texture2D_69904.png?v=55",
+  "./sszdy_assets/Texture2D_Texture2D_69838.png?v=55",
+  "./sszdy_assets/Texture2D_Texture2D_69887.png?v=55",
+  "./sszdy_assets/Sprite_Sprite_69882.png?v=55",
+  "./sszdy_assets/Sprite_Sprite_69965.png?v=55",
+  "./sszdy_assets/Texture2D_Texture2D_69844.png?v=55",
+  "./sszdy_assets/Texture2D_Texture2D_69810.png?v=55",
+  "./sszdy_assets/Sprite_Sprite_69967.png?v=55",
+  "./sszdy_assets/Texture2D_Texture2D_69921.png?v=55",
 ];
 
 self.addEventListener("install", (event) => {
@@ -77,17 +77,14 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(event.request).then((response) => {
+    fetch(event.request)
+      .then((response) => {
         if (response.ok) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
         return response;
-      });
-    }),
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || Response.error())),
   );
 });
