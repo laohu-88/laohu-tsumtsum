@@ -3,7 +3,7 @@
 const FIRST_SPRITE_ID = 1;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 8;
-const REFILL_INTERVAL_MS = 76;
+const REFILL_INTERVAL_MS = 118;
 const BALL_RADIUS = 46;
 const BODY_RADIUS = 34;
 const DESIGN_WIDTH = 430;
@@ -13,13 +13,14 @@ const SPAWN_X_RANGE = 178;
 const SPAWN_Y = 246;
 const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.08;
 const MAX_BALLS = 176;
+const MAX_ACTIVE_BALLS = 84;
 const WALL_THICKNESS = 34;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const SHORT_CLEAR_SOUND_PATH = "pop_bomb.wav?v=32";
 const LONG_CLEAR_SOUND_PATH = "pop_big.wav?v=1";
-const COLLECTION_CATALOG_PATH = "collection-catalog.json?v=2";
-const COLLECTION_CHARACTER_ASSET_PATH = "collection-character-assets.json?v=1";
+const COLLECTION_CATALOG_PATH = "collection-catalog.json?v=3";
+const COLLECTION_CHARACTER_ASSET_PATH = "collection-character-assets.json?v=2";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 118;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
@@ -28,7 +29,7 @@ const HERO_STORAGE_KEY = "laohu-tsumtsum-hero-v1";
 const COINS_STORAGE_KEY = "laohu-tsumtsum-coins-v1";
 const COLLECTION_STORAGE_KEY = "laohu-tsumtsum-collection-v1";
 const GACHA_COST = 100;
-const DUPLICATE_REFUND = 20;
+const DUPLICATE_REFUND = 12;
 const GACHA_BALL_FRAME_PATHS = [
   "sszdy_assets/Sprite_Sprite_69871.png",
   "sszdy_assets/Texture2D_Texture2D_69802.png",
@@ -247,17 +248,17 @@ const LEVELS = [
 const EXTRA_LEVEL_THEMES = [
   { subtitle: "双塔回旋", goals: { score: 2600, clears: 32 }, colors: [0x217a64, 0x101a22, 0xffd66e, 0x7fffd4] },
   { subtitle: "花瓣漏斗", goals: { score: 3200, targetClears: 18 }, targetWeight: 0.34, colors: [0x2b6f9f, 0x11172a, 0xffd166, 0x9bf6ff] },
-  { subtitle: "彩虹分流", goals: { score: 3600, combo: 7 }, colors: [0x6c4a9b, 0x171126, 0x84f2c2, 0xff9fcb] },
+  { subtitle: "彩虹分流", goals: { score: 3600, clears: 34 }, colors: [0x6c4a9b, 0x171126, 0x84f2c2, 0xff9fcb] },
   { subtitle: "左右护航", goals: { score: 3800, clears: 40 }, colors: [0x22667a, 0x10151f, 0xffb86b, 0x96f7ff] },
   { subtitle: "目标三角阵", goals: { score: 4200, targetClears: 22 }, targetWeight: 0.36, colors: [0x8f4764, 0x22131b, 0x73f7cf, 0xffd66e] },
-  { subtitle: "短链挑战", goals: { score: 3000, combo: 8 }, colors: [0x315f7f, 0x111820, 0xfbe36d, 0x68e0ff] },
+  { subtitle: "短链挑战", goals: { score: 4300, clears: 38 }, colors: [0x315f7f, 0x111820, 0xfbe36d, 0x68e0ff] },
   { subtitle: "冰桥斜坡", goals: { score: 4600, clears: 44 }, colors: [0x4c7c96, 0x10202d, 0xa7f2ff, 0xffffff] },
   { subtitle: "反向冰桥", goals: { score: 4800, targetClears: 24 }, targetWeight: 0.36, colors: [0x5c4e9a, 0x15142a, 0xffc76f, 0x9af59a] },
   { subtitle: "中央旋钮", goals: { score: 5200, shockClears: 4 }, colors: [0x7c5a2a, 0x191511, 0x9bf6ff, 0xffe082] },
   { subtitle: "星门收集", goals: { score: 5600, targetClears: 28 }, targetWeight: 0.4, colors: [0x264f82, 0x0f1524, 0xfff176, 0x73f7cf] },
   { subtitle: "窄瓶加速", goals: { score: 5000, clears: 46 }, colors: [0x1f805f, 0x101a19, 0xff9fcb, 0x7fffd4] },
-  { subtitle: "双目标冲刺", goals: { score: 6200, targetClears: 30, combo: 7 }, targetWeight: 0.42, colors: [0x81456f, 0x211427, 0x8ff4ff, 0xffd66e] },
-  { subtitle: "回廊连消", goals: { score: 6800, combo: 9 }, colors: [0x355f93, 0x121726, 0xffc76f, 0xa7f2ff] },
+  { subtitle: "双目标冲刺", goals: { score: 6200, targetClears: 30, clears: 50 }, targetWeight: 0.42, colors: [0x81456f, 0x211427, 0x8ff4ff, 0xffd66e] },
+  { subtitle: "回廊连消", goals: { score: 6800, clears: 54 }, colors: [0x355f93, 0x121726, 0xffc76f, 0xa7f2ff] },
   { subtitle: "高分终盘", goals: { score: 7600, clears: 58 }, colors: [0x9a4f3b, 0x21140f, 0x73f7cf, 0xfff176] },
   { subtitle: "松松总动员", goals: { score: 8500, targetClears: 34, shockClears: 5 }, targetWeight: 0.44, colors: [0x2d7a86, 0x101820, 0xffd66e, 0xff9fcb] },
 ];
@@ -303,7 +304,7 @@ function makeGeneratedLevel(id) {
     id,
     name: `第${id}关${bossLevel ? " · BOSS" : ""}`,
     subtitle: bossLevel ? "反派松松来袭" : theme.subtitle,
-    duration: bossLevel ? 130 : Math.min(150, 82 + (id % 12) * 6),
+    duration: bossLevel ? 140 : Math.min(150, 82 + (id % 12) * 6),
     goals: bossLevel
       ? { score: Math.floor(baseScore * 0.72), boss: true }
       : {
@@ -311,21 +312,20 @@ function makeGeneratedLevel(id) {
         score: Math.max(theme.goals.score || 0, baseScore),
         clears: theme.goals.clears ? theme.goals.clears + Math.floor(id * 1.35) : undefined,
         targetClears: theme.goals.targetClears ? theme.goals.targetClears + Math.floor(id * 0.65) : undefined,
-        combo: theme.goals.combo ? Math.min(14, theme.goals.combo + Math.floor(id / 18)) : undefined,
         shockClears: theme.goals.shockClears ? theme.goals.shockClears + Math.floor(id / 20) : undefined,
       },
     targetLabel: !bossLevel && theme.goals.targetClears ? "目标" : undefined,
     targetWeight: theme.targetWeight || 0.22,
     boss: bossLevel ? {
       ...BOSS_POOL[Math.floor(id / 10 - 1) % BOSS_POOL.length],
-      hp: 460 + id * 78,
+      hp: 560 + id * 54,
     } : null,
     background: { top: colors[0], bottom: colors[1], accent: bossLevel ? 0xff4f5f : colors[2], glow: colors[3] },
     obstacles: createExtraLevelObstacles(id + (bossLevel ? 2 : 0)),
   };
 }
 
-for (let id = LEVELS.length + 1; id <= 60; id += 1) {
+for (let id = LEVELS.length + 1; id <= 80; id += 1) {
   LEVELS.push(makeGeneratedLevel(id));
 }
 
@@ -334,8 +334,9 @@ for (const level of LEVELS) {
     const boss = BOSS_POOL[Math.floor(level.id / 10 - 1) % BOSS_POOL.length];
     level.name = `第${level.id}关 · BOSS`;
     level.subtitle = "反派松松来袭";
-    level.goals = { score: Math.max(level.goals.score || 0, 3600 + level.id * 420), boss: true };
-    level.boss = { ...boss, hp: 460 + level.id * 78 };
+    level.duration = Math.max(level.duration || 0, 132);
+    level.goals = { score: Math.max(level.goals.score || 0, 3600 + level.id * 380), boss: true };
+    level.boss = { ...boss, hp: 560 + level.id * 54 };
     level.background = { ...level.background, accent: 0xff4f5f };
   }
 }
@@ -379,6 +380,8 @@ let lineNodes;
 let particleLayer;
 let scoreText;
 let timeText;
+let countdownText;
+let countdownLastSecond = 0;
 let goalText;
 let levelText;
 let popSound;
@@ -444,6 +447,7 @@ let collectionDetailRenderToken = 0;
 let imageAvailabilityCache = new Map();
 let gachaResultLayer = null;
 let gachaAnimating = false;
+let gachaFrameImagesPromise = null;
 let obstacleLayoutSeed = 0;
 let lastCoinsEarned = 0;
 let heroContainer = null;
@@ -570,7 +574,7 @@ function addCoins(amount) {
 }
 
 function awardCoinsForScore(finalScore) {
-  const earned = Math.floor(Math.max(0, finalScore) * 0.1);
+  const earned = Math.floor(Math.max(0, finalScore) * 0.04);
   if (earned > 0) {
     addCoins(earned);
   } else {
@@ -929,7 +933,14 @@ async function loadHeroTextures() {
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
+    image.decoding = "async";
+    image.onload = () => {
+      if (image.decode) {
+        image.decode().then(() => resolve(image)).catch(() => resolve(image));
+        return;
+      }
+      resolve(image);
+    };
     image.onerror = reject;
     image.src = src;
   });
@@ -1281,6 +1292,12 @@ function ensureCollectionStyles() {
       height: 100%;
       object-fit: contain;
       transform-origin: 50% 58%;
+      opacity: 0;
+      transition: opacity 0.045s linear;
+      will-change: opacity;
+    }
+    .gacha-ball-frame.is-active {
+      opacity: 1;
     }
     .gacha-ball-flare {
       position: absolute;
@@ -1403,7 +1420,7 @@ function spawnBall() {
     return false;
   }
 
-  if (balls.length >= MAX_BALLS) {
+  if (balls.length >= MAX_ACTIVE_BALLS || balls.length >= MAX_BALLS) {
     return false;
   }
 
@@ -1479,7 +1496,8 @@ function createInitialBoardBalls() {
 }
 
 function queueRefill(count) {
-  pendingRefillCount = Math.min(MAX_BALLS, pendingRefillCount + Math.max(0, count));
+  const refillSlots = Math.max(0, INITIAL_BOARD_FILL_TARGET - balls.length - pendingRefillCount);
+  pendingRefillCount += Math.min(Math.max(0, count), refillSlots);
 }
 
 function processRefill(delta) {
@@ -2368,6 +2386,42 @@ function removeBall(ball, withParticles = true) {
   ball.view.destroy({ children: true });
 }
 
+function damageNearbyObstacles(removingBalls) {
+  if (!removingBalls.length || !levelObstacleViews.length) {
+    return;
+  }
+
+  const center = removingBalls.reduce((point, ball) => ({
+    x: point.x + ball.body.position.x / removingBalls.length,
+    y: point.y + ball.body.position.y / removingBalls.length,
+  }), { x: 0, y: 0 });
+  const hitRadius = 86 + Math.min(72, removingBalls.length * 7);
+  const hitIndexes = [];
+
+  levelObstacleViews.forEach((view, index) => {
+    const distance = Math.hypot(view.position.x - center.x, view.position.y - center.y);
+    if (distance <= hitRadius) {
+      hitIndexes.push(index);
+    }
+  });
+
+  for (let i = hitIndexes.length - 1; i >= 0; i -= 1) {
+    const index = hitIndexes[i];
+    const view = levelObstacleViews[index];
+    const body = levelObstacleBodies[index];
+    burstParticles(view.position.x, view.position.y);
+    Composite.remove(engine.world, body);
+    view.destroy({ children: true });
+    levelObstacleViews.splice(index, 1);
+    levelObstacleBodies.splice(index, 1);
+    score += 120;
+  }
+
+  if (hitIndexes.length) {
+    triggerVisualShake(10, 7);
+  }
+}
+
 function removeBalls(removingBalls, scoreMultiplier = 100) {
   const removing = new Set(removingBalls.map((ball) => ball.body.id));
   const targetClears = removingBalls.filter((ball) => ball.spriteId === currentLevelTargetSpriteId).length;
@@ -2376,6 +2430,9 @@ function removeBalls(removingBalls, scoreMultiplier = 100) {
   }
   balls = balls.filter((ball) => !removing.has(ball.body.id));
   score += removing.size * scoreMultiplier;
+  if (scoreMultiplier > 0) {
+    damageNearbyObstacles(removingBalls);
+  }
   levelStats.clears += removing.size;
   levelStats.targetClears += targetClears;
   if (gameStarted && scoreMultiplier > 0) {
@@ -2633,12 +2690,21 @@ function setupAudio() {
 
 function syncSprites() {
   const now = performance.now();
+  const escapedBalls = [];
   for (const ball of balls) {
     if (isOutsideBottleSafetyZone(ball.body)) {
-      returnEscapedBall(ball.body);
+      escapedBalls.push(ball);
+      continue;
     }
     ball.view.position.set(ball.body.position.x, ball.body.position.y);
     ball.view.rotation = ball.body.angle;
+  }
+  if (escapedBalls.length) {
+    const escapedIds = new Set(escapedBalls.map((ball) => ball.body.id));
+    for (const ball of escapedBalls) {
+      removeBall(ball, false);
+    }
+    balls = balls.filter((ball) => !escapedIds.has(ball.body.id));
   }
 
   if (isDragging) {
@@ -2650,6 +2716,11 @@ function syncSprites() {
     bossContainer.scale.set(pulse);
   }
   for (const view of levelObstacleViews) {
+    const pulse = 1 + Math.sin(now / 240) * 0.045;
+    if (view._aura) {
+      view._aura.scale.set(pulse);
+      view._aura.alpha = 0.72 + Math.sin(now / 180) * 0.18;
+    }
     if (view._ability === "bumper") {
       view.scale.set(1 + Math.sin(now / 220) * 0.035);
     } else {
@@ -2657,6 +2728,11 @@ function syncSprites() {
     }
     if (view._ability === "spinner") {
       view.rotation = view._baseRotation + Math.sin(now / 520) * 0.08;
+      if (view._mark) {
+        view._mark.rotation += 0.08;
+      }
+    } else if (view._mark) {
+      view._mark.rotation = Math.sin(now / 360) * 0.1;
     }
   }
 }
@@ -2772,26 +2848,65 @@ function makeObstacleUnits(obstacle) {
   });
 }
 
-function createObstacleIcon(assetId, size) {
+function createObstacleIcon(assetId, size, ability = "blocker") {
   const container = new PIXI.Container();
+  const abilityColor = ability === "bumper"
+    ? 0xffd66e
+    : ability === "spinner"
+      ? 0x73f7cf
+      : 0xff4f5f;
+  const aura = new PIXI.Graphics();
+  aura.beginFill(abilityColor, 0.16);
+  aura.drawCircle(0, 0, size * 0.68);
+  aura.endFill();
+  aura.lineStyle(5, abilityColor, 0.54);
+  aura.drawCircle(0, 0, size * 0.57);
+
   const shadow = new PIXI.Graphics();
   shadow.beginFill(0x030507, 0.42);
   shadow.drawCircle(3, 5, size * 0.49);
   shadow.endFill();
 
+  const badge = new PIXI.Graphics();
+  badge.beginFill(0x17070c, 0.86);
+  badge.drawCircle(0, 0, size * 0.48);
+  badge.endFill();
+  badge.lineStyle(3, 0xffffff, 0.3);
+  badge.drawCircle(0, 0, size * 0.48);
+
   const sprite = new PIXI.Sprite(obstacleTextures.get(assetId) || PIXI.Texture.from(`assets/${assetId}.png`));
   sprite.anchor.set(0.5);
-  sprite.width = size;
-  sprite.height = size;
+  sprite.width = size * 0.9;
+  sprite.height = size * 0.9;
+  sprite.tint = ability === "blocker" ? 0xffd8de : 0xffffff;
 
-  container.addChild(shadow, sprite);
+  const mark = new PIXI.Graphics();
+  mark.lineStyle(5, abilityColor, 0.95);
+  if (ability === "bumper") {
+    mark.drawCircle(0, 0, size * 0.31);
+  } else if (ability === "spinner") {
+    mark.moveTo(-size * 0.28, 0);
+    mark.lineTo(size * 0.28, 0);
+    mark.moveTo(0, -size * 0.28);
+    mark.lineTo(0, size * 0.28);
+  } else {
+    mark.moveTo(-size * 0.25, -size * 0.25);
+    mark.lineTo(size * 0.25, size * 0.25);
+    mark.moveTo(size * 0.25, -size * 0.25);
+    mark.lineTo(-size * 0.25, size * 0.25);
+  }
+  mark.alpha = 0.62;
+
+  container.addChild(aura, shadow, badge, sprite, mark);
+  container._aura = aura;
+  container._mark = mark;
   container._spinIcon = sprite;
   return container;
 }
 
 function createObstacleView(obstacle) {
   const view = new PIXI.Container();
-  const icon = createObstacleIcon(obstacle.assetId, obstacle.visualSize || obstacle.radius * 2);
+  const icon = createObstacleIcon(obstacle.assetId, obstacle.visualSize || obstacle.radius * 2, obstacle.ability);
   view.addChild(icon);
 
   view.position.set(obstacle.x, obstacle.y);
@@ -2800,6 +2915,8 @@ function createObstacleView(obstacle) {
   view._baseScale = 1;
   view._baseRotation = 0;
   view._spinIcon = icon._spinIcon;
+  view._aura = icon._aura;
+  view._mark = icon._mark;
   return view;
 }
 
@@ -2954,6 +3071,11 @@ async function startLevel(level) {
   currentLevelTargetSpriteId = null;
   levelTimeLeftMs = Number.isFinite(level.duration) ? level.duration * 1000 : Infinity;
   levelEndReason = "";
+  countdownLastSecond = 0;
+  if (countdownText) {
+    countdownText.text = "";
+    countdownText.alpha = 0;
+  }
   pausedByMenu = false;
   hidePauseMenu();
   levelStats = { targetClears: 0, clears: 0, maxCombo: 0, shockClears: 0 };
@@ -3087,6 +3209,25 @@ function createHud() {
   timeText.position.set(DESIGN_WIDTH / 2, HUD_TOP + 39);
   timeText.zIndex = 21;
   app.stage.addChild(timeText);
+
+  countdownText = new PIXI.Text("", {
+    fill: 0xffffff,
+    fontSize: 128,
+    fontWeight: "900",
+    align: "center",
+    stroke: 0xffd66e,
+    strokeThickness: 8,
+    dropShadow: true,
+    dropShadowColor: 0x000000,
+    dropShadowAlpha: 0.38,
+    dropShadowBlur: 14,
+  });
+  countdownText.anchor.set(0.5);
+  countdownText.position.set(DESIGN_WIDTH / 2, DESIGN_HEIGHT * 0.44);
+  countdownText.alpha = 0;
+  countdownText.zIndex = 90;
+  countdownText.eventMode = "none";
+  app.stage.addChild(countdownText);
 
   goalText = new PIXI.Text("", {
     fill: 0xffffff,
@@ -3315,6 +3456,31 @@ function updateGoalText() {
     parts.push(`最高 ${best}`);
   }
   goalText.text = parts.join("   ");
+}
+
+function updateFinalCountdown(now) {
+  if (!countdownText) {
+    return;
+  }
+
+  if (!gameStarted || pausedByMenu || !Number.isFinite(levelTimeLeftMs) || levelTimeLeftMs > 3000 || levelTimeLeftMs <= 0) {
+    countdownText.text = "";
+    countdownText.alpha = 0;
+    countdownLastSecond = 0;
+    return;
+  }
+
+  const secondsLeft = Math.max(1, Math.ceil(levelTimeLeftMs / 1000));
+  if (secondsLeft !== countdownLastSecond) {
+    countdownText.text = String(secondsLeft);
+    countdownText.scale.set(1.18);
+    countdownLastSecond = secondsLeft;
+    triggerHaptic(18);
+  }
+
+  countdownText.alpha = 0.46 + Math.abs(Math.sin(now / 110)) * 0.42;
+  const scale = Math.max(0.92, countdownText.scale.x - 0.03);
+  countdownText.scale.set(scale);
 }
 
 function createButton(label, x, y, width, height, onTap, options = {}) {
@@ -3736,7 +3902,7 @@ function showCollectionBook() {
   updateCoinsUi();
   renderCollectionGrid();
   loadCollectionCatalog().then(() => renderCollectionGrid());
-  setCollectionMessage("抽中后会点亮对应松松，重复返还 20 金币");
+  setCollectionMessage(`抽中后会点亮对应松松，重复返还 ${DUPLICATE_REFUND} 金币`);
 }
 
 function hideCollectionBook() {
@@ -3760,17 +3926,32 @@ function delay(ms) {
   });
 }
 
-function createGachaBallShell() {
+function preloadGachaFrames() {
+  if (!gachaFrameImagesPromise) {
+    gachaFrameImagesPromise = Promise.all(GACHA_BALL_FRAME_PATHS.map((path) => (
+      loadImage(path).catch(() => ({ src: path, currentSrc: path }))
+    )));
+  }
+  return gachaFrameImagesPromise;
+}
+
+function createGachaBallShell(frameImages) {
   const shell = document.createElement("div");
   shell.className = "gacha-ball-reel";
   const glow = document.createElement("div");
   glow.className = "gacha-ball-flare";
-  const frame = document.createElement("img");
-  frame.className = "gacha-ball-frame";
-  frame.src = GACHA_BALL_FRAME_PATHS[0];
-  frame.alt = "彩球";
-  shell.append(glow, frame);
-  shell._frameImage = frame;
+  shell.appendChild(glow);
+  const frameNodes = frameImages.map((loadedImage, index) => {
+    const frame = document.createElement("img");
+    frame.className = `gacha-ball-frame${index === 0 ? " is-active" : ""}`;
+    frame.src = loadedImage.currentSrc || loadedImage.src || GACHA_BALL_FRAME_PATHS[index];
+    frame.alt = "彩球";
+    frame.draggable = false;
+    shell.appendChild(frame);
+    return frame;
+  });
+  shell._frameNodes = frameNodes;
+  shell._activeFrameIndex = 0;
   return shell;
 }
 
@@ -3786,15 +3967,23 @@ async function runSingleGacha() {
   gachaAnimating = true;
   coins -= GACHA_COST;
   saveCoins();
-  setCollectionMessage("彩球闪动中...");
+  setCollectionMessage("准备彩球...");
 
   const resultId = FIRST_SPRITE_ID + Math.floor(Math.random() * TOTAL_SPRITES);
   const isNew = !unlockedSprites.has(resultId);
 
   try {
+    await preloadGachaFrames();
     await playGachaAnimation(resultId, isNew);
-  } catch (_) {
+  } catch (error) {
+    setCollectionMessage("彩球素材加载失败，请刷新后重试");
+    console.error(error);
     revealGachaResult(resultId, isNew);
+    await delay(1700);
+    if (gachaResultLayer) {
+      gachaResultLayer.remove();
+      gachaResultLayer = null;
+    }
     gachaAnimating = false;
   }
 }
@@ -3809,7 +3998,12 @@ async function playGachaAnimation(resultId, isNew) {
   gachaResultLayer.className = "gacha-stage";
   const inner = document.createElement("div");
   inner.className = "gacha-stage-inner";
-  const ballReel = createGachaBallShell();
+  const frameImages = await preloadGachaFrames();
+  if (!collectionOverlay) {
+    gachaAnimating = false;
+    return;
+  }
+  const ballReel = createGachaBallShell(frameImages);
   ballReel.setAttribute("aria-label", "抽卡彩球");
   const message = document.createElement("div");
   message.className = "gacha-result-text";
@@ -3818,19 +4012,28 @@ async function playGachaAnimation(resultId, isNew) {
   gachaResultLayer.appendChild(inner);
   collectionOverlay.appendChild(gachaResultLayer);
 
-  await Promise.all(GACHA_BALL_FRAME_PATHS.map((path) => loadImage(path))).catch(() => {});
   let frameIndex = 0;
   let frameDirection = 1;
-  const frameTimer = window.setInterval(() => {
-    if (!ballReel._frameImage) {
+  let lastFrameTime = 0;
+  let frameRequest = 0;
+  const stepFrames = (timestamp) => {
+    const frameNodes = ballReel._frameNodes || [];
+    if (!frameNodes.length || !gachaResultLayer) {
       return;
     }
-    frameIndex += frameDirection;
-    if (frameIndex >= GACHA_BALL_FRAME_PATHS.length - 1 || frameIndex <= 0) {
-      frameDirection *= -1;
+    if (!lastFrameTime || timestamp - lastFrameTime >= 58) {
+      frameNodes[frameIndex]?.classList.remove("is-active");
+      frameIndex += frameDirection;
+      if (frameIndex >= frameNodes.length - 1 || frameIndex <= 0) {
+        frameDirection *= -1;
+      }
+      frameNodes[frameIndex]?.classList.add("is-active");
+      ballReel._activeFrameIndex = frameIndex;
+      lastFrameTime = timestamp;
     }
-    ballReel._frameImage.src = GACHA_BALL_FRAME_PATHS[frameIndex];
-  }, 68);
+    frameRequest = window.requestAnimationFrame(stepFrames);
+  };
+  frameRequest = window.requestAnimationFrame(stepFrames);
 
   try {
     await delay(1180);
@@ -3857,7 +4060,7 @@ async function playGachaAnimation(resultId, isNew) {
       gachaResultLayer = null;
     }
   } finally {
-    window.clearInterval(frameTimer);
+    window.cancelAnimationFrame(frameRequest);
   }
   gachaAnimating = false;
 }
@@ -4205,12 +4408,15 @@ function startTicker() {
       if (timeText) {
         timeText.text = formatTime(levelTimeLeftMs);
       }
+      updateFinalCountdown(now);
 
       if (Number.isFinite(levelTimeLeftMs) && levelTimeLeftMs <= 0) {
         finishLevel(isLevelComplete());
       }
 
       processRefill(delta);
+    } else {
+      updateFinalCountdown(now);
     }
 
     updateParticles();
