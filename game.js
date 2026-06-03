@@ -11,9 +11,9 @@ const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
 const SPAWN_X_RANGE = 178;
 const SPAWN_Y = 246;
-const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.08;
+const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 2.05;
 const MAX_BALLS = 176;
-const MAX_ACTIVE_BALLS = 84;
+const MAX_ACTIVE_BALLS = 64;
 const WALL_THICKNESS = 34;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
 const MIN_OBSTACLE_DAMAGE_CHAIN = 5;
@@ -32,24 +32,24 @@ const COLLECTION_STORAGE_KEY = "laohu-tsumtsum-collection-v1";
 const GACHA_COST = 100;
 const DUPLICATE_REFUND = 12;
 const GACHA_BALL_FRAME_PATHS = [
-  "sszdy_assets/Sprite_Sprite_69871.png?v=55",
-  "sszdy_assets/Texture2D_Texture2D_69802.png?v=55",
-  "sszdy_assets/Sprite_Sprite_70061.png?v=55",
-  "sszdy_assets/Texture2D_Texture2D_70000.png?v=55",
-  "sszdy_assets/Texture2D_Texture2D_69904.png?v=55",
-  "sszdy_assets/Texture2D_Texture2D_69838.png?v=55",
-  "sszdy_assets/Texture2D_Texture2D_69887.png?v=55",
-  "sszdy_assets/Sprite_Sprite_69882.png?v=55",
-  "sszdy_assets/Sprite_Sprite_69965.png?v=55",
-  "sszdy_assets/Texture2D_Texture2D_69844.png?v=55",
-  "sszdy_assets/Texture2D_Texture2D_69810.png?v=55",
-  "sszdy_assets/Sprite_Sprite_69967.png?v=55",
-  "sszdy_assets/Texture2D_Texture2D_69921.png?v=55",
+  "sszdy_assets/Sprite_Sprite_69871.png?v=57",
+  "sszdy_assets/Texture2D_Texture2D_69802.png?v=57",
+  "sszdy_assets/Sprite_Sprite_70061.png?v=57",
+  "sszdy_assets/Texture2D_Texture2D_70000.png?v=57",
+  "sszdy_assets/Texture2D_Texture2D_69904.png?v=57",
+  "sszdy_assets/Texture2D_Texture2D_69838.png?v=57",
+  "sszdy_assets/Texture2D_Texture2D_69887.png?v=57",
+  "sszdy_assets/Sprite_Sprite_69882.png?v=57",
+  "sszdy_assets/Sprite_Sprite_69965.png?v=57",
+  "sszdy_assets/Texture2D_Texture2D_69844.png?v=57",
+  "sszdy_assets/Texture2D_Texture2D_69810.png?v=57",
+  "sszdy_assets/Sprite_Sprite_69967.png?v=57",
+  "sszdy_assets/Texture2D_Texture2D_69921.png?v=57",
 ];
 const HERO_MAX_ENERGY = 100;
 const LEVELS_PER_PAGE = 10;
 const HERO_PANEL_Y = DESIGN_HEIGHT - 130;
-const INITIAL_BOARD_FILL_TARGET = 74;
+const INITIAL_BOARD_FILL_TARGET = 32;
 
 const VILLAIN_SPRITE_IDS = [
   19, 22, 34, 37, 39, 42, 55, 63, 67, 72, 73, 74, 75, 80, 82, 90, 105, 121, 139, 141, 147, 183, 199, 203,
@@ -1460,8 +1460,8 @@ function getBottleXLimitsAtY(y) {
 }
 
 function createInitialBoardBalls() {
-  const rowSpacing = BODY_RADIUS * 1.54;
-  const colSpacing = BODY_RADIUS * 1.6;
+  const rowSpacing = BODY_RADIUS * 1.82;
+  const colSpacing = BODY_RADIUS * 2.06;
   let created = 0;
 
   for (let row = 0; created < INITIAL_BOARD_FILL_TARGET; row += 1) {
@@ -1474,7 +1474,7 @@ function createInitialBoardBalls() {
     const usableWidth = (columns - 1) * colSpacing;
     const startX = (limits.left + limits.right - usableWidth) / 2;
     for (let col = 0; col < columns && created < INITIAL_BOARD_FILL_TARGET; col += 1) {
-      const x = startX + col * colSpacing + ((row % 2) * colSpacing * 0.28);
+      const x = startX + col * colSpacing + ((row % 2) * colSpacing * 0.48);
       if (x < limits.left || x > limits.right) {
         continue;
       }
@@ -1567,49 +1567,6 @@ function findOpenSpawnPoint() {
   }) || null;
 }
 
-function isPointClearOfBalls(point, clearance, ignoredBody = null) {
-  return balls.every((ball) => {
-    if (ball.body === ignoredBody) {
-      return true;
-    }
-    const dx = ball.body.position.x - point.x;
-    const dy = ball.body.position.y - point.y;
-    return Math.hypot(dx, dy) >= clearance;
-  });
-}
-
-function findInteriorReturnPoint(ignoredBody = null) {
-  const rowSpacing = BODY_RADIUS * 1.28;
-  const colSpacing = BODY_RADIUS * 1.5;
-  for (let row = 0; row < 8; row += 1) {
-    const y = 330 + row * rowSpacing;
-    if (y > 620) {
-      break;
-    }
-    const limits = getBottleXLimitsAtY(y);
-    const columns = Math.max(1, Math.floor((limits.right - limits.left) / colSpacing) + 1);
-    const rowOffset = ((row % 2) - 0.5) * colSpacing * 0.28;
-    for (let col = 0; col < columns; col += 1) {
-      const centeredCol = (col + row) % columns;
-      const x = limits.left + (centeredCol + 0.5) * ((limits.right - limits.left) / columns) + rowOffset;
-      const point = {
-        x: Math.max(limits.left, Math.min(limits.right, x)),
-        y,
-      };
-      if (isPointClearOfBalls(point, BODY_RADIUS * 0.98, ignoredBody)) {
-        return point;
-      }
-    }
-  }
-
-  const fallbackY = 376;
-  const fallbackLimits = getBottleXLimitsAtY(fallbackY);
-  return {
-    x: fallbackLimits.left + Math.random() * (fallbackLimits.right - fallbackLimits.left),
-    y: fallbackY,
-  };
-}
-
 function isOutsideBottleSafetyZone(body) {
   const { x, y } = body.position;
   if (y < BOTTLE.leftNeckTop.y + BALL_RADIUS) {
@@ -1625,12 +1582,6 @@ function isOutsideBottleSafetyZone(body) {
   }
 
   return false;
-}
-
-function returnEscapedBall(body) {
-  Body.setPosition(body, findInteriorReturnPoint(body));
-  Body.setVelocity(body, { x: (Math.random() - 0.5) * 0.12, y: 0.22 });
-  Body.setAngularVelocity(body, 0);
 }
 
 function vibrate(pattern) {
@@ -2053,8 +2004,8 @@ function triggerBallShake(ball, strength) {
 }
 
 function triggerPhysicsQuake(origin, chainLength) {
-  const strength = Math.min(0.15, 0.075 + chainLength * 0.01);
-  const lift = Math.min(8.5, 4.8 + chainLength * 0.45);
+  const strength = Math.min(0.07, 0.034 + chainLength * 0.004);
+  const lift = Math.min(3.2, 1.85 + chainLength * 0.12);
 
   for (const ball of balls) {
     const body = ball.body;
@@ -2065,13 +2016,13 @@ function triggerPhysicsQuake(origin, chainLength) {
     const sidePulse = (Math.random() - 0.5) * strength * 0.65;
     Body.applyForce(body, body.position, {
       x: ((dx / distance) * strength * radial + sidePulse) * body.mass,
-      y: ((dy / distance) * strength * radial - strength * 1.15) * body.mass,
+      y: ((dy / distance) * strength * radial - strength * 0.38) * body.mass,
     });
     Body.setVelocity(body, {
-      x: body.velocity.x + (dx / distance) * lift * radial + (Math.random() - 0.5) * lift,
-      y: body.velocity.y - lift * (0.8 + Math.random() * 0.55),
+      x: body.velocity.x + (dx / distance) * lift * radial * 0.55 + (Math.random() - 0.5) * lift * 0.42,
+      y: body.velocity.y - lift * (0.24 + Math.random() * 0.24),
     });
-    Body.setAngularVelocity(body, body.angularVelocity + (Math.random() - 0.5) * 0.9);
+    Body.setAngularVelocity(body, body.angularVelocity + (Math.random() - 0.5) * 0.38);
   }
 
   triggerVisualShake(24 + chainLength * 2, 14 + chainLength * 1.8);
@@ -2741,11 +2692,14 @@ function syncSprites() {
     ball.view.rotation = ball.body.angle;
   }
   if (escapedBalls.length) {
-    for (const ball of escapedBalls) {
-      returnEscapedBall(ball.body);
-      ball.view.position.set(ball.body.position.x, ball.body.position.y);
-      ball.view.rotation = ball.body.angle;
+    if (escapedBalls.some((ball) => selectedBodyIds.has(ball.body.id))) {
+      clearSelection();
     }
+    const escapedIds = new Set(escapedBalls.map((ball) => ball.body.id));
+    for (const ball of escapedBalls) {
+      removeBall(ball, false);
+    }
+    balls = balls.filter((ball) => !escapedIds.has(ball.body.id));
   }
 
   if (isDragging) {
