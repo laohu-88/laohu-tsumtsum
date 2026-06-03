@@ -1,9 +1,9 @@
-const CACHE_NAME = "laohu-tsumtsum-v51";
+const CACHE_NAME = "laohu-tsumtsum-v52";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./game.js",
-  "./game.js?v=51",
+  "./game.js?v=52",
   "./character-alignments.json",
   "./manifest.json",
   "./manifest.json?v=45",
@@ -36,7 +36,6 @@ const CORE_ASSETS = [
   "./sszdy_assets/Texture2D_Texture2D_69810.png",
   "./sszdy_assets/Sprite_Sprite_69967.png",
   "./sszdy_assets/Texture2D_Texture2D_69921.png",
-  "./sszdy_assets/Texture2D_Texture2D_69814.png",
 ];
 
 self.addEventListener("install", (event) => {

@@ -12,10 +12,12 @@ const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
 const SPAWN_X_RANGE = 178;
 const SPAWN_Y = 246;
 const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.08;
+const REFILL_FALLBACK_DELAY_MS = 620;
 const MAX_BALLS = 176;
 const MAX_ACTIVE_BALLS = 84;
 const WALL_THICKNESS = 34;
 const CONNECT_DISTANCE = BALL_RADIUS * 3.05;
+const MIN_OBSTACLE_DAMAGE_CHAIN = 5;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const SHORT_CLEAR_SOUND_PATH = "pop_bomb.wav?v=32";
 const LONG_CLEAR_SOUND_PATH = "pop_big.wav?v=1";
@@ -44,7 +46,6 @@ const GACHA_BALL_FRAME_PATHS = [
   "sszdy_assets/Texture2D_Texture2D_69810.png",
   "sszdy_assets/Sprite_Sprite_69967.png",
   "sszdy_assets/Texture2D_Texture2D_69921.png",
-  "sszdy_assets/Texture2D_Texture2D_69814.png",
 ];
 const HERO_MAX_ENERGY = 100;
 const LEVELS_PER_PAGE = 10;
@@ -392,6 +393,7 @@ let selectedBodyIds = new Set();
 let particles = [];
 let refillTimer = 0;
 let pendingRefillCount = 0;
+let refillBlockedTimer = 0;
 let lastTimestamp = 0;
 let gameStarted = false;
 let isDragging = false;
@@ -449,6 +451,7 @@ let gachaResultLayer = null;
 let gachaAnimating = false;
 let gachaFrameImagesPromise = null;
 let obstacleLayoutSeed = 0;
+let levelStartInProgress = false;
 let lastCoinsEarned = 0;
 let heroContainer = null;
 let heroSprite = null;
@@ -1497,7 +1500,11 @@ function createInitialBoardBalls() {
 
 function queueRefill(count) {
   const refillSlots = Math.max(0, INITIAL_BOARD_FILL_TARGET - balls.length - pendingRefillCount);
-  pendingRefillCount += Math.min(Math.max(0, count), refillSlots);
+  const added = Math.min(Math.max(0, count), refillSlots);
+  pendingRefillCount += added;
+  if (added > 0) {
+    refillBlockedTimer = 0;
+  }
 }
 
 function processRefill(delta) {
@@ -1505,14 +1512,37 @@ function processRefill(delta) {
     return;
   }
 
+  const openSlots = Math.max(0, INITIAL_BOARD_FILL_TARGET - balls.length);
+  if (openSlots <= 0) {
+    pendingRefillCount = 0;
+    refillTimer = 0;
+    refillBlockedTimer = 0;
+    return;
+  }
+
+  pendingRefillCount = Math.min(pendingRefillCount, openSlots);
   refillTimer += delta;
   while (pendingRefillCount > 0 && refillTimer >= REFILL_INTERVAL_MS) {
     if (!spawnBall()) {
+      refillBlockedTimer += delta;
+      if (refillBlockedTimer >= REFILL_FALLBACK_DELAY_MS && balls.length < MAX_ACTIVE_BALLS && balls.length < MAX_BALLS) {
+        createBallAt(findInteriorReturnPoint(), {
+          velocity: { x: (Math.random() - 0.5) * 0.16, y: 0.55 },
+          angularVelocity: (Math.random() - 0.5) * 0.05,
+          restitution: 0.18,
+        });
+        pendingRefillCount -= 1;
+        refillTimer = 0;
+        refillBlockedTimer = 0;
+        updateGoalText();
+        continue;
+      }
       refillTimer = REFILL_INTERVAL_MS;
       return;
     }
     pendingRefillCount -= 1;
     refillTimer -= REFILL_INTERVAL_MS;
+    refillBlockedTimer = 0;
   }
 }
 
@@ -1525,17 +1555,33 @@ function findOpenSpawnPoint() {
     { x: SPAWN_X_CENTER + 66, y: SPAWN_Y + 20 },
   ];
 
-  for (let i = 0; i < 7; i += 1) {
+  const addRowAttempts = (y, count) => {
+    const limits = getBottleXLimitsAtY(y);
+    for (let i = 0; i < count; i += 1) {
+      const t = count === 1 ? 0.5 : i / (count - 1);
+      attempts.push({
+        x: limits.left + (limits.right - limits.left) * t + (Math.random() - 0.5) * 16,
+        y: y + (Math.random() - 0.5) * 12,
+      });
+    }
+  };
+
+  addRowAttempts(SPAWN_Y + 42, 5);
+  addRowAttempts(SPAWN_Y + 82, 6);
+  addRowAttempts(SPAWN_Y + 122, 6);
+
+  for (let i = 0; i < 12; i += 1) {
+    const y = SPAWN_Y + Math.random() * 128;
+    const limits = getBottleXLimitsAtY(y);
     attempts.push({
-      x: SPAWN_X_CENTER + (Math.random() - 0.5) * SPAWN_X_RANGE,
-      y: SPAWN_Y + Math.random() * 30,
+      x: limits.left + Math.random() * (limits.right - limits.left),
+      y,
     });
   }
 
   return attempts.find((point) => {
-    const leftLimit = point.y < 246 ? BOTTLE.leftNeckTop.x + BODY_RADIUS : BOTTLE.leftMouth.x + BODY_RADIUS;
-    const rightLimit = point.y < 246 ? BOTTLE.rightNeckTop.x - BODY_RADIUS : BOTTLE.rightMouth.x - BODY_RADIUS;
-    if (point.x < leftLimit || point.x > rightLimit) {
+    const limits = getBottleXLimitsAtY(point.y);
+    if (point.x < limits.left || point.x > limits.right) {
       return false;
     }
 
@@ -2386,8 +2432,19 @@ function removeBall(ball, withParticles = true) {
   ball.view.destroy({ children: true });
 }
 
-function damageNearbyObstacles(removingBalls) {
-  if (!removingBalls.length || !levelObstacleViews.length) {
+function getObstacleMaxHp(obstacle) {
+  const abilityHp = obstacle.ability === "spinner"
+    ? 5
+    : obstacle.ability === "bumper"
+      ? 4
+      : 3;
+  const levelBonus = Math.min(2, Math.floor((currentLevel?.id || 1) / 12));
+  const shapeBonus = obstacle.type === "bar" ? 1 : 0;
+  return abilityHp + levelBonus + shapeBonus;
+}
+
+function damageNearbyObstacles(removingBalls, scoreMultiplier = 100) {
+  if (removingBalls.length < MIN_OBSTACLE_DAMAGE_CHAIN || !levelObstacleViews.length) {
     return;
   }
 
@@ -2395,7 +2452,11 @@ function damageNearbyObstacles(removingBalls) {
     x: point.x + ball.body.position.x / removingBalls.length,
     y: point.y + ball.body.position.y / removingBalls.length,
   }), { x: 0, y: 0 });
-  const hitRadius = 86 + Math.min(72, removingBalls.length * 7);
+  const skillClear = scoreMultiplier >= 120;
+  const hitRadius = (skillClear ? 92 : 66) + Math.min(skillClear ? 74 : 46, removingBalls.length * (skillClear ? 5 : 4));
+  const damage = skillClear
+    ? Math.max(2, Math.floor(removingBalls.length / 7))
+    : Math.max(1, Math.floor((removingBalls.length - MIN_OBSTACLE_DAMAGE_CHAIN) / 4) + 1);
   const hitIndexes = [];
 
   levelObstacleViews.forEach((view, index) => {
@@ -2410,11 +2471,17 @@ function damageNearbyObstacles(removingBalls) {
     const view = levelObstacleViews[index];
     const body = levelObstacleBodies[index];
     burstParticles(view.position.x, view.position.y);
-    Composite.remove(engine.world, body);
-    view.destroy({ children: true });
-    levelObstacleViews.splice(index, 1);
-    levelObstacleBodies.splice(index, 1);
-    score += 120;
+    view._hp = Math.max(0, (view._hp ?? 1) - damage);
+    view._damageFlash = 14;
+    if (view._hp <= 0) {
+      Composite.remove(engine.world, body);
+      view.destroy({ children: true });
+      levelObstacleViews.splice(index, 1);
+      levelObstacleBodies.splice(index, 1);
+      score += 180;
+    } else {
+      score += 24 * damage;
+    }
   }
 
   if (hitIndexes.length) {
@@ -2431,7 +2498,7 @@ function removeBalls(removingBalls, scoreMultiplier = 100) {
   balls = balls.filter((ball) => !removing.has(ball.body.id));
   score += removing.size * scoreMultiplier;
   if (scoreMultiplier > 0) {
-    damageNearbyObstacles(removingBalls);
+    damageNearbyObstacles(removingBalls, scoreMultiplier);
   }
   levelStats.clears += removing.size;
   levelStats.targetClears += targetClears;
@@ -2700,11 +2767,11 @@ function syncSprites() {
     ball.view.rotation = ball.body.angle;
   }
   if (escapedBalls.length) {
-    const escapedIds = new Set(escapedBalls.map((ball) => ball.body.id));
     for (const ball of escapedBalls) {
-      removeBall(ball, false);
+      returnEscapedBall(ball.body);
+      ball.view.position.set(ball.body.position.x, ball.body.position.y);
+      ball.view.rotation = ball.body.angle;
     }
-    balls = balls.filter((ball) => !escapedIds.has(ball.body.id));
   }
 
   if (isDragging) {
@@ -2717,9 +2784,16 @@ function syncSprites() {
   }
   for (const view of levelObstacleViews) {
     const pulse = 1 + Math.sin(now / 240) * 0.045;
+    const hpRatio = view._maxHp ? Math.max(0.32, view._hp / view._maxHp) : 1;
+    if (view._damageFlash > 0) {
+      view._damageFlash -= 1;
+      view.alpha = 0.74 + Math.abs(Math.sin(now / 38)) * 0.26;
+    } else {
+      view.alpha = 1;
+    }
     if (view._aura) {
       view._aura.scale.set(pulse);
-      view._aura.alpha = 0.72 + Math.sin(now / 180) * 0.18;
+      view._aura.alpha = (0.5 + hpRatio * 0.28) + Math.sin(now / 180) * 0.14;
     }
     if (view._ability === "bumper") {
       view.scale.set(1 + Math.sin(now / 220) * 0.035);
@@ -2733,6 +2807,9 @@ function syncSprites() {
       }
     } else if (view._mark) {
       view._mark.rotation = Math.sin(now / 360) * 0.1;
+    }
+    if (view._mark) {
+      view._mark.alpha = 0.3 + hpRatio * 0.42;
     }
   }
 }
@@ -2912,6 +2989,9 @@ function createObstacleView(obstacle) {
   view.position.set(obstacle.x, obstacle.y);
   view.zIndex = 5;
   view._ability = obstacle.ability;
+  view._maxHp = getObstacleMaxHp(obstacle);
+  view._hp = view._maxHp;
+  view._damageFlash = 0;
   view._baseScale = 1;
   view._baseRotation = 0;
   view._spinIcon = icon._spinIcon;
@@ -3066,41 +3146,51 @@ function applyBossDamage(amount, origin = bossState?.position) {
 }
 
 async function startLevel(level) {
-  gameStarted = false;
-  currentLevel = level;
-  currentLevelTargetSpriteId = null;
-  levelTimeLeftMs = Number.isFinite(level.duration) ? level.duration * 1000 : Infinity;
-  levelEndReason = "";
-  countdownLastSecond = 0;
-  if (countdownText) {
-    countdownText.text = "";
-    countdownText.alpha = 0;
+  if (!level || levelStartInProgress) {
+    return;
   }
-  pausedByMenu = false;
-  hidePauseMenu();
-  levelStats = { targetClears: 0, clears: 0, maxCombo: 0, shockClears: 0 };
-  heroEnergy = 0;
-  refillTimer = 0;
-  pendingRefillCount = 0;
-  obstacleLayoutSeed = Math.floor(Math.random() * 1000000) + level.id * 1009;
-  clearBalls();
-  clearParticles();
-  clearLevelObstacles();
-  clearBoss();
-  score = 0;
-  updateScoreText();
-  updateGoalText();
-  drawBackground();
-  await Promise.all([loadRoundTextures(), loadHeroTexture(), loadLevelObstacleTextures(level)]);
-  createLevelObstacles();
-  currentLevelTargetSpriteId = level.goals.targetClears ? selectedSpriteIds[0] : null;
-  await setupBossForLevel();
-  createInitialBoardBalls();
-  hideLevelSelect();
-  hideResultOverlay();
-  updateHudForLevel();
-  updateHeroUi();
-  gameStarted = true;
+
+  levelStartInProgress = true;
+  gameStarted = false;
+  try {
+    hideLevelSelect();
+    hideResultOverlay();
+    hidePauseMenu();
+    currentLevel = level;
+    currentLevelTargetSpriteId = null;
+    levelTimeLeftMs = Number.isFinite(level.duration) ? level.duration * 1000 : Infinity;
+    levelEndReason = "";
+    countdownLastSecond = 0;
+    if (countdownText) {
+      countdownText.text = "";
+      countdownText.alpha = 0;
+    }
+    pausedByMenu = false;
+    levelStats = { targetClears: 0, clears: 0, maxCombo: 0, shockClears: 0 };
+    heroEnergy = 0;
+    refillTimer = 0;
+    pendingRefillCount = 0;
+    refillBlockedTimer = 0;
+    obstacleLayoutSeed = Math.floor(Math.random() * 1000000) + level.id * 1009;
+    clearBalls();
+    clearParticles();
+    clearLevelObstacles();
+    clearBoss();
+    score = 0;
+    updateScoreText();
+    updateGoalText();
+    drawBackground();
+    await Promise.all([loadRoundTextures(), loadHeroTexture(), loadLevelObstacleTextures(level)]);
+    createLevelObstacles();
+    currentLevelTargetSpriteId = level.goals.targetClears ? selectedSpriteIds[0] : null;
+    await setupBossForLevel();
+    createInitialBoardBalls();
+    updateHudForLevel();
+    updateHeroUi();
+    gameStarted = true;
+  } finally {
+    levelStartInProgress = false;
+  }
 }
 
 async function restartGame() {
@@ -3928,9 +4018,10 @@ function delay(ms) {
 
 function preloadGachaFrames() {
   if (!gachaFrameImagesPromise) {
-    gachaFrameImagesPromise = Promise.all(GACHA_BALL_FRAME_PATHS.map((path) => (
-      loadImage(path).catch(() => ({ src: path, currentSrc: path }))
-    )));
+    gachaFrameImagesPromise = Promise.all(GACHA_BALL_FRAME_PATHS.map((path) => loadImage(path))).catch((error) => {
+      gachaFrameImagesPromise = null;
+      throw error;
+    });
   }
   return gachaFrameImagesPromise;
 }
@@ -3965,21 +4056,24 @@ async function runSingleGacha() {
   }
 
   gachaAnimating = true;
-  coins -= GACHA_COST;
-  saveCoins();
   setCollectionMessage("准备彩球...");
 
   const resultId = FIRST_SPRITE_ID + Math.floor(Math.random() * TOTAL_SPRITES);
   const isNew = !unlockedSprites.has(resultId);
+  let spentCoins = false;
 
   try {
     await preloadGachaFrames();
+    coins -= GACHA_COST;
+    spentCoins = true;
+    saveCoins();
     await playGachaAnimation(resultId, isNew);
   } catch (error) {
-    setCollectionMessage("彩球素材加载失败，请刷新后重试");
+    if (spentCoins) {
+      addCoins(GACHA_COST);
+    }
+    setCollectionMessage("彩球素材加载失败，金币已退回");
     console.error(error);
-    revealGachaResult(resultId, isNew);
-    await delay(1700);
     if (gachaResultLayer) {
       gachaResultLayer.remove();
       gachaResultLayer = null;
@@ -4007,7 +4101,7 @@ async function playGachaAnimation(resultId, isNew) {
   ballReel.setAttribute("aria-label", "抽卡彩球");
   const message = document.createElement("div");
   message.className = "gacha-result-text";
-  message.textContent = "彩球闪动中...";
+  message.textContent = "";
   inner.append(ballReel, message);
   gachaResultLayer.appendChild(inner);
   collectionOverlay.appendChild(gachaResultLayer);
@@ -4041,7 +4135,7 @@ async function playGachaAnimation(resultId, isNew) {
       return;
     }
     ballReel.classList.add("is-opening");
-    message.textContent = "光芒聚合！";
+    message.textContent = "";
     await delay(780);
 
     await loadImage(`assets/${resultId}.png`).catch(() => {});
@@ -4092,6 +4186,10 @@ function hideLevelSelect() {
 }
 
 function showLevelSelect() {
+  if (levelStartInProgress) {
+    return;
+  }
+
   gameStarted = false;
   clearSelection();
   cancelPendingHeroSkill();
@@ -4345,10 +4443,13 @@ function showResultOverlay(passed) {
   }, { fill: 0x27313d, line: 0x9fd6ff });
   resultOverlay.addChild(retry);
 
-  const nextLabel = passed && currentLevel?.id < LEVELS.length ? "下一关" : "关卡";
+  const nextLevel = passed && !isSprint && currentLevel
+    ? LEVELS.find((level) => level.id === currentLevel.id + 1)
+    : null;
+  const nextLabel = nextLevel ? "下一关" : "关卡";
   const next = createButton(nextLabel, 232, 444, 132, 52, () => {
-    if (passed && currentLevel?.id < LEVELS.length) {
-      startLevel(LEVELS[currentLevel.id]).catch(showFatalError);
+    if (nextLevel) {
+      startLevel(nextLevel).catch(showFatalError);
       return;
     }
     showLevelSelect();
@@ -4470,6 +4571,7 @@ window.__tsumDebug = {
     balls: balls.length,
     selectedSpriteIds: [...selectedSpriteIds],
     obstacleCount: levelObstacleViews.length,
+    obstacleHp: levelObstacleViews.map((view) => view._hp ?? null),
     pendingRefillCount,
   }),
 };
