@@ -3,7 +3,7 @@
 const FIRST_SPRITE_ID = 1;
 const LAST_SPRITE_ID = FIRST_SPRITE_ID + TOTAL_SPRITES - 1;
 const PARTICIPANT_COUNT = 8;
-const SPAWN_INTERVAL_MS = 680;
+const REFILL_INTERVAL_MS = 76;
 const BALL_RADIUS = 46;
 const BODY_RADIUS = 34;
 const DESIGN_WIDTH = 430;
@@ -29,14 +29,58 @@ const COINS_STORAGE_KEY = "laohu-tsumtsum-coins-v1";
 const COLLECTION_STORAGE_KEY = "laohu-tsumtsum-collection-v1";
 const GACHA_COST = 100;
 const DUPLICATE_REFUND = 20;
-const GACHA_CHEST_FRAMES = [
-  70085, 70089, 70092, 70093, 70098, 70100, 70103, 70105, 70109, 70111, 70115, 70117, 70122, 70123, 70127,
-  70460, 70461, 70464, 70469, 70472, 70474, 70477, 70479, 70482, 70486, 70490, 70493,
-];
-const GACHA_CHEST_FIRST_FRAME = GACHA_CHEST_FRAMES[0];
 const HERO_MAX_ENERGY = 100;
 const LEVELS_PER_PAGE = 10;
 const HERO_PANEL_Y = DESIGN_HEIGHT - 130;
+const INITIAL_BOARD_FILL_TARGET = 74;
+
+const VILLAIN_SPRITE_IDS = [
+  19, 22, 34, 37, 39, 42, 55, 63, 67, 72, 73, 74, 75, 80, 82, 90, 105, 121, 139, 141, 147, 183, 199, 203,
+  206, 209, 213, 214, 226, 235, 255, 263, 265, 292, 293, 300, 302, 305, 314, 337, 342, 349, 365, 371, 373, 379, 381, 383,
+  390, 392, 416, 418, 419,
+];
+const VILLAIN_SPRITE_ID_SET = new Set(VILLAIN_SPRITE_IDS);
+const FRIENDLY_SPRITE_IDS = allSpriteIds().filter((id) => !VILLAIN_SPRITE_ID_SET.has(id));
+
+const VILLAIN_ROSTER = [
+  { name: "查尔斯·蒙兹", assetId: 19 },
+  { name: "戴维·琼斯", assetId: 22 },
+  { name: "巴博萨", assetId: 34 },
+  { name: "蟒蛇卡阿", assetId: 39 },
+  { name: "谢利·可汗", assetId: 55 },
+  { name: "副市长羊咩咩", assetId: 63 },
+  { name: "皮特", assetId: 67 },
+  { name: "葛朵", assetId: 72 },
+  { name: "特曼妮夫人", assetId: 73 },
+  { name: "玛琳菲森", assetId: 74 },
+  { name: "红心皇后", assetId: 75 },
+  { name: "蓝道", assetId: 80 },
+  { name: "辛德罗姆", assetId: 82 },
+  { name: "蒙斯特罗", assetId: 90 },
+  { name: "祖格", assetId: 121 },
+  { name: "刀疤", assetId: 141 },
+  { name: "强霸", assetId: 183 },
+  { name: "艾德", assetId: 139 },
+  { name: "桑琪", assetId: 206 },
+  { name: "伊阿古", assetId: 213 },
+  { name: "贾方", assetId: 214 },
+  { name: "黑胡子", assetId: 226 },
+  { name: "霍博士", assetId: 235 },
+  { name: "魔熊", assetId: 263 },
+  { name: "乌基布基", assetId: 265 },
+  { name: "女巫", assetId: 300 },
+  { name: "盖斯顿", assetId: 305 },
+  { name: "单于", assetId: 314 },
+  { name: "虎克船长", assetId: 337 },
+  { name: "乌苏拉", assetId: 342 },
+  { name: "达拉", assetId: 365 },
+  { name: "妖怪", assetId: 371 },
+  { name: "德拉库斯", assetId: 379 },
+  { name: "熊抱哥", assetId: 381 },
+  { name: "塔玛托", assetId: 390 },
+  { name: "班仔", assetId: 392 },
+  { name: "杰克森·风暴", assetId: 418 },
+];
 
 const HEROES = [
   { id: "mickey", name: "米奇", assetId: 287, skillName: "星光竖线", skill: "vertical", description: "滑动选择一列，清除直线上的松松" },
@@ -49,16 +93,7 @@ const HEROES = [
   { id: "goofy", name: "高飞", assetId: 120, skillName: "高飞竖线", skill: "vertical", description: "滑动选择一列，释放纵向清除" },
 ];
 
-const BOSS_POOL = [
-  { name: "皮特", assetId: 292 },
-  { name: "乌苏拉", assetId: 334 },
-  { name: "贾方", assetId: 335 },
-  { name: "刀疤", assetId: 336 },
-  { name: "哈迪斯", assetId: 337 },
-  { name: "库伊拉", assetId: 338 },
-  { name: "盖斯顿", assetId: 339 },
-  { name: "熊抱哥", assetId: 340 },
-];
+const BOSS_POOL = VILLAIN_ROSTER;
 
 const LEVELS = [
   {
@@ -336,7 +371,8 @@ let linkSound;
 let selectedBalls = [];
 let selectedBodyIds = new Set();
 let particles = [];
-let spawnTimer = 0;
+let refillTimer = 0;
+let pendingRefillCount = 0;
 let lastTimestamp = 0;
 let gameStarted = false;
 let isDragging = false;
@@ -388,7 +424,6 @@ let collectionCatalogPromise = null;
 let collectionCharacterAssetMap = null;
 let collectionCharacterAssetPromise = null;
 let collectionDetailRenderToken = 0;
-let gachaChestFrameSourcesPromise = null;
 let imageAvailabilityCache = new Map();
 let gachaResultLayer = null;
 let gachaAnimating = false;
@@ -431,16 +466,11 @@ function shuffle(values) {
 }
 
 function pickRoundSprites() {
-  const ids = [];
-  for (let id = FIRST_SPRITE_ID; id <= LAST_SPRITE_ID; id += 1) {
-    ids.push(id);
+  if (FRIENDLY_SPRITE_IDS.length < PARTICIPANT_COUNT) {
+    throw new Error(`FRIENDLY_SPRITE_IDS must be at least ${PARTICIPANT_COUNT}.`);
   }
 
-  if (ids.length < PARTICIPANT_COUNT) {
-    throw new Error(`TOTAL_SPRITES must be at least ${PARTICIPANT_COUNT}.`);
-  }
-
-  return shuffle(ids).slice(0, PARTICIPANT_COUNT);
+  return shuffle(FRIENDLY_SPRITE_IDS).slice(0, PARTICIPANT_COUNT);
 }
 
 function normalizeSpriteId(value) {
@@ -1176,51 +1206,81 @@ function ensureCollectionStyles() {
       background: radial-gradient(circle at 50% 18%, rgba(255, 241, 118, 0.34), rgba(18, 25, 35, 0.96) 46%, rgba(28, 17, 38, 0.98));
     }
     .gacha-chest {
-      width: 190px;
-      height: 190px;
-      object-fit: contain;
-      animation: gachaPulse 0.42s ease-in-out infinite alternate;
-    }
-    .gacha-chest-shell {
       position: relative;
       width: 190px;
-      height: 166px;
-      display: grid;
-      place-items: end center;
+      height: 164px;
+      filter: drop-shadow(0 24px 28px rgba(0, 0, 0, 0.48));
       animation: gachaPulse 0.42s ease-in-out infinite alternate;
     }
-    .gacha-chest-shell::before,
-    .gacha-chest-shell::after {
-      content: "";
+    .gacha-chest-glow {
       position: absolute;
-      left: 18px;
-      right: 18px;
-      border: 4px solid rgba(255, 255, 255, 0.75);
-      box-shadow: 0 0 28px rgba(255, 214, 110, 0.55);
+      left: 50%;
+      top: 52%;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #fff9a8;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.2);
+      box-shadow: 0 0 34px 16px rgba(255, 248, 140, 0.82), 0 0 110px 50px rgba(255, 194, 74, 0.42);
+      transition: transform 0.42s ease, opacity 0.42s ease;
     }
-    .gacha-chest-shell::before {
+    .gacha-chest-lid,
+    .gacha-chest-body {
+      position: absolute;
+      left: 15px;
+      right: 15px;
+      border: 5px solid #7a4614;
+      box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.18), 0 0 28px rgba(255, 214, 110, 0.35);
+    }
+    .gacha-chest-lid {
       top: 8px;
-      height: 74px;
-      border-radius: 70px 70px 12px 12px;
-      background: linear-gradient(135deg, #ffe485, #8a62dc 54%, #4c317c);
+      height: 70px;
+      border-radius: 68px 68px 12px 12px;
+      background: linear-gradient(145deg, #fff39a 0%, #ffc93e 44%, #d9871f 100%);
       transform-origin: 50% 100%;
-      animation: gachaLid 0.56s ease-in-out infinite alternate;
+      transition: transform 0.48s cubic-bezier(.2,.85,.2,1.2), top 0.48s ease;
     }
-    .gacha-chest-shell::after {
+    .gacha-chest-body {
       bottom: 0;
-      height: 92px;
+      height: 88px;
       border-radius: 8px;
-      background: linear-gradient(135deg, #4c317c, #8a62dc 48%, #ffd66e);
+      background: linear-gradient(145deg, #9a4f16 0%, #e79c23 35%, #ffd765 64%, #a85716 100%);
+    }
+    .gacha-chest-band {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: 30px;
+      height: 92px;
+      background: linear-gradient(#fff4a6, #c47916);
+      border-left: 4px solid rgba(122, 70, 20, 0.65);
+      border-right: 4px solid rgba(122, 70, 20, 0.65);
+      transform: translateX(-50%);
     }
     .gacha-chest-lock {
-      position: relative;
+      position: absolute;
+      left: 50%;
+      top: 88px;
       z-index: 2;
       width: 42px;
       height: 34px;
-      margin-bottom: 42px;
+      transform: translateX(-50%);
       border-radius: 7px;
       background: #fff176;
+      border: 4px solid #7a4614;
       box-shadow: 0 0 18px rgba(255, 241, 118, 0.85);
+    }
+    .gacha-chest.is-opening {
+      animation: gachaChestOpen 0.76s ease both;
+    }
+    .gacha-chest.is-opening .gacha-chest-lid {
+      top: -18px;
+      transform: rotateX(62deg) translateY(-22px);
+    }
+    .gacha-chest.is-opening .gacha-chest-glow {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(2.7);
     }
     .gacha-result {
       width: 230px;
@@ -1241,9 +1301,11 @@ function ensureCollectionStyles() {
       from { transform: scale(0.9) rotate(-8deg); }
       to { transform: scale(1.12) rotate(10deg); }
     }
-    @keyframes gachaLid {
-      from { transform: rotateX(0deg) translateY(0); }
-      to { transform: rotateX(46deg) translateY(-18px); }
+    @keyframes gachaChestOpen {
+      0% { transform: scale(1) rotate(0deg); }
+      32% { transform: scale(1.08) rotate(-5deg); }
+      60% { transform: scale(1.12) rotate(5deg); }
+      100% { transform: scale(1.04) rotate(0deg); }
     }
     @keyframes gachaSpin {
       from { transform: perspective(500px) rotateY(0deg) scale(0.35); opacity: 0; }
@@ -1282,26 +1344,18 @@ function makeCircularSprite(texture, isTarget = false) {
   return container;
 }
 
-function spawnBall() {
-  if (!gameStarted || textures.length === 0) {
-    return;
-  }
-
-  if (balls.length >= MAX_BALLS) {
-    return;
-  }
-
-  const spawnPoint = findOpenSpawnPoint();
-  if (!spawnPoint) {
-    return;
-  }
-
+function pickTextureEntry() {
   let textureEntry = textures[Math.floor(Math.random() * textures.length)];
   if (currentLevelTargetSpriteId && Math.random() < (currentLevel?.targetWeight || 0.2)) {
     textureEntry = textures.find((entry) => entry.id === currentLevelTargetSpriteId) || textureEntry;
   }
-  const body = Bodies.circle(spawnPoint.x, spawnPoint.y, BODY_RADIUS, {
-    restitution: 0.24,
+  return textureEntry;
+}
+
+function createBallAt(point, options = {}) {
+  const textureEntry = pickTextureEntry();
+  const body = Bodies.circle(point.x, point.y, BODY_RADIUS, {
+    restitution: options.restitution ?? 0.24,
     friction: 0.012,
     frictionStatic: 0,
     frictionAir: 0.004,
@@ -1309,18 +1363,118 @@ function spawnBall() {
     density: 0.00145,
   });
 
-  Body.setVelocity(body, {
+  Body.setVelocity(body, options.velocity || {
     x: (Math.random() - 0.5) * 0.7,
     y: 2.35 + Math.random() * 0.45,
   });
-  Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.18);
+  Body.setAngularVelocity(body, options.angularVelocity ?? ((Math.random() - 0.5) * 0.18));
   Composite.add(engine.world, body);
 
   const view = makeCircularSprite(textureEntry.texture, textureEntry.id === currentLevelTargetSpriteId);
   view.zIndex = 3;
   app.stage.addChild(view);
   balls.push({ body, view, spriteId: textureEntry.id });
+  return balls[balls.length - 1];
+}
+
+function spawnBall() {
+  if (!gameStarted || textures.length === 0) {
+    return false;
+  }
+
+  if (balls.length >= MAX_BALLS) {
+    return false;
+  }
+
+  const spawnPoint = findOpenSpawnPoint();
+  if (!spawnPoint) {
+    return false;
+  }
+
+  createBallAt(spawnPoint);
   updateGoalText();
+  return true;
+}
+
+function getBottleXLimitsAtY(y) {
+  if (y < 246) {
+    return {
+      left: BOTTLE.leftNeckTop.x + BODY_RADIUS,
+      right: BOTTLE.rightNeckTop.x - BODY_RADIUS,
+    };
+  }
+
+  if (y < 360) {
+    const t = (y - BOTTLE.leftMouth.y) / (BOTTLE.leftShoulder.y - BOTTLE.leftMouth.y);
+    return {
+      left: BOTTLE.leftMouth.x + (BOTTLE.leftShoulder.x - BOTTLE.leftMouth.x) * t + BODY_RADIUS,
+      right: BOTTLE.rightMouth.x + (BOTTLE.rightShoulder.x - BOTTLE.rightMouth.x) * t - BODY_RADIUS,
+    };
+  }
+
+  if (y < 806) {
+    const t = (y - BOTTLE.leftShoulder.y) / (BOTTLE.leftLowerSide.y - BOTTLE.leftShoulder.y);
+    return {
+      left: BOTTLE.leftShoulder.x + (BOTTLE.leftLowerSide.x - BOTTLE.leftShoulder.x) * t + BODY_RADIUS,
+      right: BOTTLE.rightShoulder.x + (BOTTLE.rightLowerSide.x - BOTTLE.rightShoulder.x) * t - BODY_RADIUS,
+    };
+  }
+
+  return {
+    left: BOTTLE.leftFloor.x + BODY_RADIUS,
+    right: BOTTLE.rightFloor.x - BODY_RADIUS,
+  };
+}
+
+function createInitialBoardBalls() {
+  const rowSpacing = BODY_RADIUS * 1.54;
+  const colSpacing = BODY_RADIUS * 1.6;
+  let created = 0;
+
+  for (let row = 0; created < INITIAL_BOARD_FILL_TARGET; row += 1) {
+    const y = BOTTOM_SAFE_Y - 20 - row * rowSpacing;
+    if (y < 318) {
+      break;
+    }
+    const limits = getBottleXLimitsAtY(y);
+    const columns = Math.max(1, Math.floor((limits.right - limits.left) / colSpacing) + 1);
+    const usableWidth = (columns - 1) * colSpacing;
+    const startX = (limits.left + limits.right - usableWidth) / 2;
+    for (let col = 0; col < columns && created < INITIAL_BOARD_FILL_TARGET; col += 1) {
+      const x = startX + col * colSpacing + ((row % 2) * colSpacing * 0.28);
+      if (x < limits.left || x > limits.right) {
+        continue;
+      }
+      createBallAt({ x, y }, {
+        velocity: { x: (Math.random() - 0.5) * 0.18, y: (Math.random() - 0.5) * 0.12 },
+        angularVelocity: (Math.random() - 0.5) * 0.04,
+        restitution: 0.18,
+      });
+      created += 1;
+    }
+  }
+
+  updateGoalText();
+}
+
+function queueRefill(count) {
+  pendingRefillCount = Math.min(MAX_BALLS, pendingRefillCount + Math.max(0, count));
+}
+
+function processRefill(delta) {
+  if (pendingRefillCount <= 0) {
+    return;
+  }
+
+  refillTimer += delta;
+  while (pendingRefillCount > 0 && refillTimer >= REFILL_INTERVAL_MS) {
+    if (!spawnBall()) {
+      refillTimer = REFILL_INTERVAL_MS;
+      return;
+    }
+    pendingRefillCount -= 1;
+    refillTimer -= REFILL_INTERVAL_MS;
+  }
 }
 
 function findOpenSpawnPoint() {
@@ -2163,6 +2317,9 @@ function removeBalls(removingBalls, scoreMultiplier = 100) {
   score += removing.size * scoreMultiplier;
   levelStats.clears += removing.size;
   levelStats.targetClears += targetClears;
+  if (gameStarted && scoreMultiplier > 0) {
+    queueRefill(removing.size);
+  }
   updateScoreText();
   updateGoalText();
   return removing.size;
@@ -2431,6 +2588,16 @@ function syncSprites() {
     const pulse = 1 + Math.sin(now / 260) * 0.025;
     bossContainer.scale.set(pulse);
   }
+  for (const view of levelObstacleViews) {
+    if (view._ability === "bumper") {
+      view.scale.set(1 + Math.sin(now / 220) * 0.035);
+    } else {
+      view.scale.set(1);
+    }
+    if (view._ability === "spinner") {
+      view.rotation = view._baseRotation + Math.sin(now / 520) * 0.08;
+    }
+  }
 }
 
 function updateFeedbackShake() {
@@ -2473,36 +2640,86 @@ function clearLevelObstacles() {
   levelObstacleViews = [];
 }
 
+function getVillainObstacleConfig(index) {
+  const levelId = currentLevel?.id || 1;
+  const roster = VILLAIN_ROSTER.length ? VILLAIN_ROSTER : [{ name: "邪恶松松", assetId: VILLAIN_SPRITE_IDS[0] }];
+  const villain = roster[(levelId * 5 + index * 3) % roster.length];
+  const abilities = levelId >= 8
+    ? ["blocker", "bumper", "spinner"]
+    : levelId >= 4
+      ? ["blocker", "bumper"]
+      : ["blocker"];
+  return {
+    ...villain,
+    ability: abilities[index % abilities.length],
+  };
+}
+
+function createObstacleIcon(assetId, size) {
+  const container = new PIXI.Container();
+  const sprite = PIXI.Sprite.from(`assets/${assetId}.png`);
+  sprite.anchor.set(0.5);
+  sprite.width = size;
+  sprite.height = size;
+
+  const mask = new PIXI.Graphics();
+  mask.beginFill(0xffffff);
+  mask.drawCircle(0, 0, size / 2);
+  mask.endFill();
+  sprite.mask = mask;
+
+  const ring = new PIXI.Graphics();
+  ring.lineStyle(4, 0xff5167, 0.92);
+  ring.beginFill(0x120815, 0.42);
+  ring.drawCircle(0, 0, size / 2);
+  ring.endFill();
+
+  container.addChild(ring, sprite, mask);
+  container._spinIcon = sprite;
+  return container;
+}
+
 function createObstacleView(obstacle) {
-  const view = new PIXI.Graphics();
+  const view = new PIXI.Container();
   const accent = currentLevel?.background?.accent || 0xffd66e;
-  view.lineStyle(3, 0xffffff, 0.62);
-  view.beginFill(0x0c121a, 0.48);
+  const shape = new PIXI.Graphics();
+  shape.lineStyle(3, 0xffd7df, 0.72);
+  shape.beginFill(obstacle.ability === "bumper" ? 0x4b1224 : 0x0c121a, 0.54);
 
   if (obstacle.type === "bar") {
-    view.drawRoundedRect(-obstacle.width / 2, -obstacle.height / 2, obstacle.width, obstacle.height, 5);
+    shape.drawRoundedRect(-obstacle.width / 2, -obstacle.height / 2, obstacle.width, obstacle.height, 8);
   } else {
-    view.drawCircle(0, 0, obstacle.radius);
+    shape.drawCircle(0, 0, obstacle.radius * 1.12);
   }
 
-  view.endFill();
-  view.beginFill(accent, 0.68);
+  shape.endFill();
+  shape.beginFill(accent, obstacle.ability === "spinner" ? 0.34 : 0.22);
   if (obstacle.type === "bar") {
-    view.drawRoundedRect(-obstacle.width / 2 + 6, -2, obstacle.width - 12, 4, 2);
+    shape.drawRoundedRect(-obstacle.width / 2 + 8, -3, obstacle.width - 16, 6, 3);
   } else {
-    view.drawCircle(0, 0, Math.max(4, obstacle.radius * 0.42));
-    view.endFill();
-    view.lineStyle(2, accent, 0.9);
-    view.moveTo(-obstacle.radius * 1.45, 0);
-    view.lineTo(obstacle.radius * 1.45, 0);
-    view.moveTo(0, -obstacle.radius * 1.45);
-    view.lineTo(0, obstacle.radius * 1.45);
-    view.beginFill(accent, 0.28);
+    shape.drawCircle(0, 0, obstacle.radius * 0.86);
   }
-  view.endFill();
+  shape.endFill();
+  view.addChild(shape);
+
+  if (obstacle.type === "bar") {
+    const iconCount = obstacle.width > 94 ? 3 : 2;
+    for (let i = 0; i < iconCount; i += 1) {
+      const icon = createObstacleIcon(obstacle.assetId, Math.min(50, Math.max(36, obstacle.height * 4.1)));
+      icon.position.set((i - (iconCount - 1) / 2) * Math.min(42, obstacle.width / iconCount), 0);
+      view.addChild(icon);
+    }
+  } else {
+    const icon = createObstacleIcon(obstacle.assetId, obstacle.radius * 2.18);
+    view.addChild(icon);
+  }
+
   view.position.set(obstacle.x, obstacle.y);
   view.rotation = obstacle.angle || 0;
   view.zIndex = 2;
+  view._ability = obstacle.ability;
+  view._baseScale = 1;
+  view._baseRotation = obstacle.angle || 0;
   return view;
 }
 
@@ -2514,24 +2731,30 @@ function createLevelObstacles() {
     app.stage.addChild(obstacleLayer);
   }
 
-  for (const obstacle of currentLevel?.obstacles || []) {
+  for (const [index, obstacleBase] of (currentLevel?.obstacles || []).entries()) {
+    const obstacle = {
+      ...obstacleBase,
+      ...getVillainObstacleConfig(index),
+    };
     const collisionWidth = obstacle.collisionWidth || obstacle.width * 0.72;
     const collisionHeight = obstacle.collisionHeight || Math.max(6, obstacle.height * 0.7);
     const collisionRadius = obstacle.collisionRadius || obstacle.radius * 0.72;
+    const restitution = obstacle.ability === "bumper" ? 0.62 : 0.34;
+    const friction = obstacle.ability === "blocker" ? 0.02 : 0;
     const body = obstacle.type === "bar"
       ? Bodies.rectangle(obstacle.x, obstacle.y, collisionWidth, collisionHeight, {
         isStatic: true,
         angle: obstacle.angle || 0,
         chamfer: { radius: Math.max(4, collisionHeight / 2) },
-        restitution: 0.36,
-        friction: 0,
+        restitution,
+        friction,
         frictionStatic: 0,
         slop: 0.12,
       })
       : Bodies.circle(obstacle.x, obstacle.y, collisionRadius, {
         isStatic: true,
-        restitution: 0.34,
-        friction: 0,
+        restitution,
+        friction,
         frictionStatic: 0,
         slop: 0.12,
       });
@@ -2665,7 +2888,8 @@ async function startLevel(level) {
   hidePauseMenu();
   levelStats = { targetClears: 0, clears: 0, maxCombo: 0, shockClears: 0 };
   heroEnergy = 0;
-  spawnTimer = 0;
+  refillTimer = 0;
+  pendingRefillCount = 0;
   clearBalls();
   clearParticles();
   clearLevelObstacles();
@@ -2678,6 +2902,7 @@ async function startLevel(level) {
   await Promise.all([loadRoundTextures(), loadHeroTexture()]);
   currentLevelTargetSpriteId = level.goals.targetClears ? selectedSpriteIds[0] : null;
   await setupBossForLevel();
+  createInitialBoardBalls();
   hideLevelSelect();
   hideResultOverlay();
   updateHudForLevel();
@@ -3466,23 +3691,19 @@ function delay(ms) {
 
 function createGachaChestShell() {
   const shell = document.createElement("div");
-  shell.className = "gacha-chest-shell";
+  shell.className = "gacha-chest";
+  const glow = document.createElement("div");
+  glow.className = "gacha-chest-glow";
+  const lid = document.createElement("div");
+  lid.className = "gacha-chest-lid";
+  const body = document.createElement("div");
+  body.className = "gacha-chest-body";
+  const band = document.createElement("div");
+  band.className = "gacha-chest-band";
   const lock = document.createElement("div");
   lock.className = "gacha-chest-lock";
-  shell.appendChild(lock);
+  shell.append(glow, lid, body, band, lock);
   return shell;
-}
-
-function loadGachaChestFrameSources() {
-  if (!gachaChestFrameSourcesPromise) {
-    gachaChestFrameSourcesPromise = Promise
-      .all(GACHA_CHEST_FRAMES.map((frame) => {
-        const src = `sszdy_assets/Sprite_Sprite_${frame}.png`;
-        return checkImageAvailable(src).then((available) => available ? src : null);
-      }))
-      .then((sources) => sources.filter(Boolean));
-  }
-  return gachaChestFrameSourcesPromise;
 }
 
 async function runSingleGacha() {
@@ -3520,10 +3741,8 @@ async function playGachaAnimation(resultId, isNew) {
   gachaResultLayer.className = "gacha-stage";
   const inner = document.createElement("div");
   inner.className = "gacha-stage-inner";
-  const chest = document.createElement("img");
-  chest.className = "gacha-chest";
-  chest.alt = "抽卡宝箱";
-  chest.src = `sszdy_assets/Sprite_Sprite_${GACHA_CHEST_FIRST_FRAME}.png`;
+  const chest = createGachaChestShell();
+  chest.setAttribute("aria-label", "抽卡宝箱");
   const message = document.createElement("div");
   message.className = "gacha-result-text";
   message.textContent = "宝箱开启中...";
@@ -3531,25 +3750,13 @@ async function playGachaAnimation(resultId, isNew) {
   gachaResultLayer.appendChild(inner);
   collectionOverlay.appendChild(gachaResultLayer);
 
-  const frameSources = await loadGachaChestFrameSources();
-
-  if (frameSources.length) {
-    const frameSequence = [
-      ...frameSources,
-      ...frameSources.slice(0, -1).reverse(),
-      ...frameSources,
-    ];
-    for (const src of frameSequence) {
-      if (!gachaResultLayer) {
-        return;
-      }
-      chest.src = src;
-      await delay(46);
-    }
-  } else {
-    chest.replaceWith(createGachaChestShell());
-    await delay(1150);
+  await delay(420);
+  if (!gachaResultLayer) {
+    return;
   }
+  chest.classList.add("is-opening");
+  message.textContent = "金光闪耀！";
+  await delay(880);
 
   await loadImage(`assets/${resultId}.png`).catch(() => {});
   inner.textContent = "";
@@ -3917,11 +4124,7 @@ function startTicker() {
         finishLevel(isLevelComplete());
       }
 
-      spawnTimer += delta;
-      while (spawnTimer >= SPAWN_INTERVAL_MS) {
-        spawnBall();
-        spawnTimer -= SPAWN_INTERVAL_MS;
-      }
+      processRefill(delta);
     }
 
     updateParticles();
@@ -3950,11 +4153,21 @@ function showFatalError(error) {
 window.__tsumDebug = {
   levels: () => LEVELS.map((level) => ({ id: level.id, name: level.name, boss: Boolean(level.boss), infinite: Boolean(level.infinite) })),
   heroes: () => HEROES.map((hero) => ({ id: hero.id, name: hero.name, assetId: hero.assetId, skill: hero.skill })),
+  alignments: () => ({
+    friendlyCount: FRIENDLY_SPRITE_IDS.length,
+    villainCount: VILLAIN_SPRITE_IDS.length,
+    friendlyIds: [...FRIENDLY_SPRITE_IDS],
+    villainIds: [...VILLAIN_SPRITE_IDS],
+  }),
   startLevelById: (id) => {
     const level = LEVELS.find((item) => item.id === id);
     if (level) {
       startLevel(level).catch(showFatalError);
     }
+  },
+  removeBallsForTest: (count = 3) => {
+    const removing = balls.slice(0, Math.max(0, Math.min(count, balls.length)));
+    return removeBalls(removing);
   },
   state: () => ({
     currentLevelId: currentLevel?.id || null,
@@ -3963,6 +4176,9 @@ window.__tsumDebug = {
     heroEnergy,
     score,
     balls: balls.length,
+    selectedSpriteIds: [...selectedSpriteIds],
+    obstacleCount: levelObstacleViews.length,
+    pendingRefillCount,
   }),
 };
 
