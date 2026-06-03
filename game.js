@@ -12,7 +12,6 @@ const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
 const SPAWN_X_RANGE = 178;
 const SPAWN_Y = 246;
 const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 1.08;
-const REFILL_FALLBACK_DELAY_MS = 620;
 const MAX_BALLS = 176;
 const MAX_ACTIVE_BALLS = 84;
 const WALL_THICKNESS = 34;
@@ -393,7 +392,6 @@ let selectedBodyIds = new Set();
 let particles = [];
 let refillTimer = 0;
 let pendingRefillCount = 0;
-let refillBlockedTimer = 0;
 let lastTimestamp = 0;
 let gameStarted = false;
 let isDragging = false;
@@ -1502,9 +1500,6 @@ function queueRefill(count) {
   const refillSlots = Math.max(0, INITIAL_BOARD_FILL_TARGET - balls.length - pendingRefillCount);
   const added = Math.min(Math.max(0, count), refillSlots);
   pendingRefillCount += added;
-  if (added > 0) {
-    refillBlockedTimer = 0;
-  }
 }
 
 function processRefill(delta) {
@@ -1516,7 +1511,6 @@ function processRefill(delta) {
   if (openSlots <= 0) {
     pendingRefillCount = 0;
     refillTimer = 0;
-    refillBlockedTimer = 0;
     return;
   }
 
@@ -1524,25 +1518,11 @@ function processRefill(delta) {
   refillTimer += delta;
   while (pendingRefillCount > 0 && refillTimer >= REFILL_INTERVAL_MS) {
     if (!spawnBall()) {
-      refillBlockedTimer += delta;
-      if (refillBlockedTimer >= REFILL_FALLBACK_DELAY_MS && balls.length < MAX_ACTIVE_BALLS && balls.length < MAX_BALLS) {
-        createBallAt(findInteriorReturnPoint(), {
-          velocity: { x: (Math.random() - 0.5) * 0.16, y: 0.55 },
-          angularVelocity: (Math.random() - 0.5) * 0.05,
-          restitution: 0.18,
-        });
-        pendingRefillCount -= 1;
-        refillTimer = 0;
-        refillBlockedTimer = 0;
-        updateGoalText();
-        continue;
-      }
       refillTimer = REFILL_INTERVAL_MS;
       return;
     }
     pendingRefillCount -= 1;
     refillTimer -= REFILL_INTERVAL_MS;
-    refillBlockedTimer = 0;
   }
 }
 
@@ -1605,11 +1585,11 @@ function isPointClearOfBalls(point, clearance, ignoredBody = null) {
 }
 
 function findInteriorReturnPoint(ignoredBody = null) {
-  const rowSpacing = BODY_RADIUS * 1.48;
-  const colSpacing = BODY_RADIUS * 1.56;
-  for (let row = 0; row < 12; row += 1) {
-    const y = BOTTOM_SAFE_Y - 18 - row * rowSpacing;
-    if (y < 344) {
+  const rowSpacing = BODY_RADIUS * 1.28;
+  const colSpacing = BODY_RADIUS * 1.5;
+  for (let row = 0; row < 8; row += 1) {
+    const y = 330 + row * rowSpacing;
+    if (y > 620) {
       break;
     }
     const limits = getBottleXLimitsAtY(y);
@@ -1622,13 +1602,13 @@ function findInteriorReturnPoint(ignoredBody = null) {
         x: Math.max(limits.left, Math.min(limits.right, x)),
         y,
       };
-      if (isPointClearOfBalls(point, BODY_RADIUS * 1.18, ignoredBody)) {
+      if (isPointClearOfBalls(point, BODY_RADIUS * 0.98, ignoredBody)) {
         return point;
       }
     }
   }
 
-  const fallbackY = Math.min(BOTTOM_SAFE_Y - 72, 642);
+  const fallbackY = 376;
   const fallbackLimits = getBottleXLimitsAtY(fallbackY);
   return {
     x: fallbackLimits.left + Math.random() * (fallbackLimits.right - fallbackLimits.left),
@@ -3170,7 +3150,6 @@ async function startLevel(level) {
     heroEnergy = 0;
     refillTimer = 0;
     pendingRefillCount = 0;
-    refillBlockedTimer = 0;
     obstacleLayoutSeed = Math.floor(Math.random() * 1000000) + level.id * 1009;
     clearBalls();
     clearParticles();
@@ -4018,9 +3997,15 @@ function delay(ms) {
 
 function preloadGachaFrames() {
   if (!gachaFrameImagesPromise) {
-    gachaFrameImagesPromise = Promise.all(GACHA_BALL_FRAME_PATHS.map((path) => loadImage(path))).catch((error) => {
-      gachaFrameImagesPromise = null;
-      throw error;
+    gachaFrameImagesPromise = Promise.all(GACHA_BALL_FRAME_PATHS.map((path) => (
+      loadImage(path)
+        .then((image) => ({ src: image.currentSrc || image.src || path }))
+        .catch(() => null)
+    ))).then((results) => {
+      const loadedFrames = results.filter(Boolean);
+      return loadedFrames.length
+        ? loadedFrames
+        : GACHA_BALL_FRAME_PATHS.map((path) => ({ src: path }));
     });
   }
   return gachaFrameImagesPromise;
@@ -4035,9 +4020,17 @@ function createGachaBallShell(frameImages) {
   const frameNodes = frameImages.map((loadedImage, index) => {
     const frame = document.createElement("img");
     frame.className = `gacha-ball-frame${index === 0 ? " is-active" : ""}`;
-    frame.src = loadedImage.currentSrc || loadedImage.src || GACHA_BALL_FRAME_PATHS[index];
+    frame.src = loadedImage.src || loadedImage.currentSrc || GACHA_BALL_FRAME_PATHS[index];
     frame.alt = "彩球";
     frame.draggable = false;
+    frame.addEventListener("error", () => {
+      frame.remove();
+      shell._frameNodes = (shell._frameNodes || []).filter((node) => node !== frame);
+      if (!shell._frameNodes.some((node) => node.classList.contains("is-active"))) {
+        shell._frameNodes[0]?.classList.add("is-active");
+        shell._activeFrameIndex = 0;
+      }
+    }, { once: true });
     shell.appendChild(frame);
     return frame;
   });
@@ -4114,6 +4107,10 @@ async function playGachaAnimation(resultId, isNew) {
     const frameNodes = ballReel._frameNodes || [];
     if (!frameNodes.length || !gachaResultLayer) {
       return;
+    }
+    if (frameIndex >= frameNodes.length) {
+      frameIndex = 0;
+      frameDirection = 1;
     }
     if (!lastFrameTime || timestamp - lastFrameTime >= 58) {
       frameNodes[frameIndex]?.classList.remove("is-active");
