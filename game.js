@@ -20,8 +20,10 @@ const MIN_OBSTACLE_DAMAGE_CHAIN = 5;
 const CONNECT_SOUND_PATH = "connect.wav?v=11";
 const SHORT_CLEAR_SOUND_PATH = "pop_bomb.wav?v=32";
 const LONG_CLEAR_SOUND_PATH = "pop_big.wav?v=1";
+const TOY_TOUCH_SOUND_PATH = "toy_touch.wav?v=1";
 const COLLECTION_CATALOG_PATH = "collection-catalog.json?v=3";
 const COLLECTION_CHARACTER_ASSET_PATH = "collection-character-assets.json?v=2";
+const TOY_HOUSE_BACKGROUND_PATH = "sszdy_assets/Texture2D_Texture2D_8066.png?v=60";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 118;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
@@ -58,6 +60,14 @@ const VILLAIN_SPRITE_IDS = [
 ];
 const VILLAIN_SPRITE_ID_SET = new Set(VILLAIN_SPRITE_IDS);
 const FRIENDLY_SPRITE_IDS = allSpriteIds().filter((id) => !VILLAIN_SPRITE_ID_SET.has(id));
+const FRIENDLY_SPRITE_ID_SET = new Set(FRIENDLY_SPRITE_IDS);
+const TOY_HOUSE_MAX_TSUMS = 12;
+const TOY_HOUSE_FLOOR_Y = 900;
+const TOY_HOUSE_BODY_RADIUS = 23;
+const TOY_HOUSE_WALL_CATEGORY = 0x0001;
+const TOY_HOUSE_TOY_CATEGORY = 0x0002;
+const TOY_HOUSE_LANE_FLOOR_CATEGORIES = [0x0004, 0x0008, 0x0010];
+const TOY_HOUSE_LANE_FLOOR_YS = [704, 760, 816];
 
 const VILLAIN_ROSTER = [
   { name: "查尔斯·蒙兹", assetId: 19 },
@@ -387,6 +397,7 @@ let levelText;
 let popSound;
 let popBigSound;
 let linkSound;
+let toyTouchSound;
 let selectedBalls = [];
 let selectedBodyIds = new Set();
 let particles = [];
@@ -404,6 +415,7 @@ let audioContext = null;
 let popBuffer = null;
 let popBigBuffer = null;
 let linkBuffer = null;
+let toyTouchBuffer = null;
 let keepAwakeVideo = null;
 let keepAwakeCanvas = null;
 let keepAwakeTimer = null;
@@ -451,6 +463,17 @@ let gachaFrameImagesPromise = null;
 let obstacleLayoutSeed = 0;
 let levelStartInProgress = false;
 let lastCoinsEarned = 0;
+let spriteTextureCache = new Map();
+let spriteTextureLoadPromises = new Map();
+let sceneTextureCache = new Map();
+let sceneTextureLoadPromises = new Map();
+let textureWarmupCursor = 0;
+let toyHouseContainer = null;
+let toyHouseEngine = null;
+let toyHouseTsums = [];
+let toyHouseEffects = [];
+let toyHouseActive = false;
+let toyHouseLoading = false;
 let heroContainer = null;
 let heroSprite = null;
 let heroEnergyBar = null;
@@ -813,101 +836,15 @@ function createBottlePhysics() {
   Composite.add(engine.world, bottleParts);
 }
 
-async function loadRoundTextures() {
-  selectedSpriteIds = pickRoundSprites();
-  const paths = selectedSpriteIds.map((id) => `assets/${id}.png`);
-
-  if (PIXI.Assets && PIXI.Assets.load) {
-    const loadedTextures = await Promise.all(paths.map((path) => PIXI.Assets.load(path)));
-    textures = selectedSpriteIds.map((id, index) => ({
-      id,
-      texture: loadedTextures[index],
-    }));
-    return;
+async function loadPixiTexture(path) {
+  if (sceneTextureCache.has(path)) {
+    return sceneTextureCache.get(path);
+  }
+  if (sceneTextureLoadPromises.has(path)) {
+    return sceneTextureLoadPromises.get(path);
   }
 
-  textures = await new Promise((resolve, reject) => {
-    const loader = new PIXI.Loader();
-    paths.forEach((path) => loader.add(path, path));
-    loader.load((_, resources) => {
-      const loadedTextures = paths.map((path) => resources[path]?.texture).filter(Boolean);
-      if (loadedTextures.length !== paths.length) {
-        reject(new Error("Some assets failed to load."));
-        return;
-      }
-      resolve(selectedSpriteIds.map((id, index) => ({
-        id,
-        texture: loadedTextures[index],
-      })));
-    });
-    loader.onError.add((error) => reject(error));
-  });
-}
-
-async function loadHeroTexture() {
-  const path = `assets/${selectedHero.assetId}.png`;
-  if (heroTextures.has(selectedHero.id)) {
-    selectedHeroTexture = heroTextures.get(selectedHero.id);
-    return;
-  }
-
-  if (PIXI.Assets && PIXI.Assets.load) {
-    selectedHeroTexture = await PIXI.Assets.load(path);
-    heroTextures.set(selectedHero.id, selectedHeroTexture);
-    return;
-  }
-
-  selectedHeroTexture = await new Promise((resolve, reject) => {
-    const loader = new PIXI.Loader();
-    loader.add(path, path);
-    loader.load((_, resources) => {
-      const texture = resources[path]?.texture;
-      if (!texture) {
-        reject(new Error("Hero asset failed to load."));
-        return;
-      }
-      resolve(texture);
-    });
-    loader.onError.add((error) => reject(error));
-  });
-  heroTextures.set(selectedHero.id, selectedHeroTexture);
-}
-
-async function loadLevelObstacleTextures(level) {
-  const assetIds = new Set((level?.obstacles || []).map((_, index) => getVillainObstacleConfig(index).assetId));
-  if (assetIds.size === 0) {
-    return;
-  }
-
-  if (PIXI.Assets && PIXI.Assets.load) {
-    await Promise.all([...assetIds].map(async (id) => {
-      const texture = await PIXI.Assets.load(`assets/${id}.png`).catch(() => null);
-      if (texture) {
-        obstacleTextures.set(id, texture);
-      }
-    }));
-    return;
-  }
-
-  await new Promise((resolve) => {
-    const loader = new PIXI.Loader();
-    [...assetIds].forEach((id) => loader.add(String(id), `assets/${id}.png`));
-    loader.load((_, resources) => {
-      for (const id of assetIds) {
-        const texture = resources[String(id)]?.texture;
-        if (texture) {
-          obstacleTextures.set(id, texture);
-        }
-      }
-      resolve();
-    });
-    loader.onError.add(() => resolve());
-  });
-}
-
-async function loadHeroTextures() {
-  await Promise.all(HEROES.map(async (hero) => {
-    const path = `assets/${hero.assetId}.png`;
+  const promise = (async () => {
     let texture;
     if (PIXI.Assets && PIXI.Assets.load) {
       texture = await PIXI.Assets.load(path);
@@ -918,7 +855,7 @@ async function loadHeroTextures() {
         loader.load((_, resources) => {
           const loaded = resources[path]?.texture;
           if (!loaded) {
-            reject(new Error("Hero asset failed to load."));
+            reject(new Error(`Asset failed to load: ${path}`));
             return;
           }
           resolve(loaded);
@@ -926,6 +863,116 @@ async function loadHeroTextures() {
         loader.onError.add((error) => reject(error));
       });
     }
+    sceneTextureCache.set(path, texture);
+    return texture;
+  })();
+
+  sceneTextureLoadPromises.set(path, promise);
+  promise.catch(() => {
+    sceneTextureLoadPromises.delete(path);
+  });
+  return promise;
+}
+
+async function loadSpriteTexture(id) {
+  if (spriteTextureCache.has(id)) {
+    return spriteTextureCache.get(id);
+  }
+  if (spriteTextureLoadPromises.has(id)) {
+    return spriteTextureLoadPromises.get(id);
+  }
+
+  const promise = loadPixiTexture(`assets/${id}.png`).then((texture) => {
+    spriteTextureCache.set(id, texture);
+    return texture;
+  });
+  spriteTextureLoadPromises.set(id, promise);
+  promise.catch(() => {
+    spriteTextureLoadPromises.delete(id);
+  });
+  return promise;
+}
+
+async function loadSpriteTextures(ids) {
+  return Promise.all(ids.map((id) => loadSpriteTexture(id)));
+}
+
+function warmSpriteTextures(ids, batchSize = 6) {
+  const queue = [...new Set(ids)]
+    .map(normalizeSpriteId)
+    .filter((id) => id && !spriteTextureCache.has(id) && !spriteTextureLoadPromises.has(id));
+  if (queue.length === 0) {
+    return;
+  }
+
+  const runBatch = () => {
+    const batch = queue.splice(0, batchSize);
+    batch.forEach((id) => {
+      loadSpriteTexture(id).catch(() => {});
+    });
+    if (queue.length > 0) {
+      window.setTimeout(runBatch, 80);
+    }
+  };
+
+  const requestIdle = window.requestIdleCallback || ((callback) => window.setTimeout(callback, 120));
+  requestIdle(runBatch);
+}
+
+function warmGameplayTextureWindow() {
+  const ids = HEROES.map((hero) => hero.assetId);
+  ids.push(...VILLAIN_ROSTER.slice(0, 18).map((villain) => villain.assetId));
+  for (let i = 0; i < 72; i += 1) {
+    ids.push(FRIENDLY_SPRITE_IDS[(textureWarmupCursor + i) % FRIENDLY_SPRITE_IDS.length]);
+  }
+  textureWarmupCursor = (textureWarmupCursor + 72) % FRIENDLY_SPRITE_IDS.length;
+  warmSpriteTextures(ids, 10);
+}
+
+async function loadRoundTextures() {
+  selectedSpriteIds = pickRoundSprites();
+  const loadedTextures = await loadSpriteTextures(selectedSpriteIds);
+
+  textures = selectedSpriteIds.map((id, index) => ({
+    id,
+    texture: loadedTextures[index],
+  }));
+
+  const warmIds = [];
+  for (let i = 0; i < 24; i += 1) {
+    warmIds.push(FRIENDLY_SPRITE_IDS[(textureWarmupCursor + i) % FRIENDLY_SPRITE_IDS.length]);
+  }
+  textureWarmupCursor = (textureWarmupCursor + 24) % FRIENDLY_SPRITE_IDS.length;
+  warmSpriteTextures(warmIds, 6);
+}
+
+async function loadHeroTexture() {
+  if (heroTextures.has(selectedHero.id)) {
+    selectedHeroTexture = heroTextures.get(selectedHero.id);
+    return;
+  }
+
+  selectedHeroTexture = await loadSpriteTexture(selectedHero.assetId);
+  heroTextures.set(selectedHero.id, selectedHeroTexture);
+}
+
+async function loadLevelObstacleTextures(level) {
+  const assetIds = new Set((level?.obstacles || []).map((_, index) => getVillainObstacleConfig(index).assetId));
+  if (assetIds.size === 0) {
+    return;
+  }
+
+  await Promise.all([...assetIds].map(async (id) => {
+    const texture = await loadSpriteTexture(id).catch(() => null);
+    if (texture) {
+      obstacleTextures.set(id, texture);
+    }
+  }));
+}
+
+async function loadHeroTextures() {
+  await Promise.all(HEROES.map(async (hero) => {
+    const texture = await loadSpriteTexture(hero.assetId);
     heroTextures.set(hero.id, texture);
   }));
   selectedHeroTexture = heroTextures.get(selectedHero.id) || selectedHeroTexture;
@@ -1708,6 +1755,9 @@ async function loadSoundBuffers() {
     popBigBuffer ? Promise.resolve() : loadAudioBuffer(LONG_CLEAR_SOUND_PATH).then((buffer) => {
       popBigBuffer = buffer;
     }),
+    toyTouchBuffer ? Promise.resolve() : loadAudioBuffer(TOY_TOUCH_SOUND_PATH).then((buffer) => {
+      toyTouchBuffer = buffer;
+    }),
   ]);
 }
 
@@ -1784,6 +1834,7 @@ async function unlockAudio() {
   unlockHtmlAudio(linkSound);
   unlockHtmlAudio(popSound);
   unlockHtmlAudio(popBigSound);
+  unlockHtmlAudio(toyTouchSound);
 }
 
 function primeSyntheticAudio() {
@@ -1827,6 +1878,7 @@ function primeAudioFromGesture() {
     unlockHtmlAudio(linkSound);
     unlockHtmlAudio(popSound);
     unlockHtmlAudio(popBigSound);
+    unlockHtmlAudio(toyTouchSound);
     return;
   }
 
@@ -2305,6 +2357,436 @@ function playPopSound(chainLength) {
   playSoundBuffer(popBuffer, 0.95) || playHtmlSound(popSound);
 }
 
+function playToyHouseTouchSound() {
+  playSyntheticPop(0.12, 520, 0.07);
+  setTimeout(() => playSyntheticPop(0.08, 760, 0.06), 34);
+  playSoundBuffer(toyTouchBuffer, 0.62) || playHtmlSound(toyTouchSound);
+}
+
+function fitSpriteCover(sprite, width, height) {
+  const textureWidth = sprite.texture.width || width;
+  const textureHeight = sprite.texture.height || height;
+  const scale = Math.max(width / textureWidth, height / textureHeight);
+  sprite.anchor.set(0.5);
+  sprite.scale.set(scale);
+  sprite.position.set(width / 2, height / 2);
+}
+
+function getUnlockedFriendlySpriteIds() {
+  return [...unlockedSprites]
+    .map(normalizeSpriteId)
+    .filter((id) => id && FRIENDLY_SPRITE_ID_SET.has(id))
+    .sort((a, b) => a - b);
+}
+
+function drawHeartShape(graphics, x, y, size, color, alpha = 1) {
+  graphics.beginFill(color, alpha);
+  graphics.drawCircle(x - size * 0.28, y - size * 0.18, size * 0.28);
+  graphics.drawCircle(x + size * 0.28, y - size * 0.18, size * 0.28);
+  graphics.moveTo(x - size * 0.58, y - size * 0.1);
+  graphics.quadraticCurveTo(x, y + size * 0.7, x + size * 0.58, y - size * 0.1);
+  graphics.lineTo(x, y + size * 0.58);
+  graphics.lineTo(x - size * 0.58, y - size * 0.1);
+  graphics.endFill();
+}
+
+function addToyHouseStaticRect(x, y, width, height, options = {}) {
+  if (!toyHouseEngine) {
+    return null;
+  }
+
+  const bodyOptions = {
+    isStatic: true,
+    restitution: options.restitution ?? 0.22,
+    friction: options.friction ?? 0.18,
+    frictionStatic: 0.04,
+  };
+  if (options.collisionFilter) {
+    bodyOptions.collisionFilter = options.collisionFilter;
+  }
+
+  const body = Bodies.rectangle(x + width / 2, y + height / 2, width, height, bodyOptions);
+  Composite.add(toyHouseEngine.world, body);
+  return body;
+}
+
+function drawToyHouseFurniture(container) {
+  const furniture = new PIXI.Graphics();
+
+  furniture.beginFill(0x7f5a44, 0.82);
+  furniture.drawRoundedRect(36, 214, 162, 18, 8);
+  furniture.endFill();
+  furniture.beginFill(0xffd778, 0.92);
+  for (let i = 0; i < 8; i += 1) {
+    furniture.drawRoundedRect(52 + i * 17, 172 + (i % 3) * 6, 12, 42 - (i % 2) * 8, 4);
+  }
+  furniture.endFill();
+
+  furniture.beginFill(0xffb0b8, 0.96);
+  furniture.drawRoundedRect(34, 682, 142, 58, 14);
+  furniture.endFill();
+  furniture.beginFill(0xffd2d8, 0.96);
+  furniture.drawRoundedRect(48, 648, 112, 54, 16);
+  furniture.endFill();
+  furniture.beginFill(0x9fd6ff, 0.92);
+  furniture.drawRoundedRect(64, 628, 58, 42, 12);
+  furniture.endFill();
+
+  furniture.beginFill(0xffd66e, 0.94);
+  furniture.drawRoundedRect(270, 724, 68, 56, 9);
+  furniture.endFill();
+  furniture.beginFill(0x73f7cf, 0.94);
+  furniture.drawRoundedRect(320, 690, 52, 90, 9);
+  furniture.endFill();
+  furniture.beginFill(0xffffff, 0.28);
+  furniture.drawRoundedRect(282, 736, 18, 18, 5);
+  furniture.drawRoundedRect(332, 704, 16, 16, 5);
+  furniture.endFill();
+
+  furniture.beginFill(0xf8f0dc, 0.96);
+  furniture.drawRoundedRect(238, 540, 124, 24, 12);
+  furniture.endFill();
+  furniture.beginFill(0x82c9ff, 0.82);
+  furniture.drawRoundedRect(256, 502, 88, 42, 12);
+  furniture.endFill();
+
+  furniture.beginFill(0xffffff, 0.16);
+  furniture.drawEllipse(DESIGN_WIDTH / 2, 820, 176, 34);
+  furniture.endFill();
+
+  furniture.zIndex = 2;
+  container.addChild(furniture);
+
+  TOY_HOUSE_LANE_FLOOR_YS.forEach((floorY, index) => {
+    addToyHouseStaticRect(0, floorY, DESIGN_WIDTH, 18, {
+      restitution: 0.18,
+      friction: 0.28,
+      collisionFilter: {
+        category: TOY_HOUSE_LANE_FLOOR_CATEGORIES[index],
+        mask: TOY_HOUSE_TOY_CATEGORY,
+      },
+    });
+  });
+  addToyHouseStaticRect(0, TOY_HOUSE_FLOOR_Y, DESIGN_WIDTH, 44, { restitution: 0.18, friction: 0.28 });
+  addToyHouseStaticRect(-26, 110, 34, 820, { restitution: 0.18 });
+  addToyHouseStaticRect(DESIGN_WIDTH - 8, 110, 34, 820, { restitution: 0.18 });
+}
+
+function makeToyHouseTsumView(texture) {
+  const view = new PIXI.Container();
+  const shadow = new PIXI.Graphics();
+  shadow.beginFill(0x382816, 0.22);
+  shadow.drawEllipse(0, 22, 25, 8);
+  shadow.endFill();
+  view.addChild(shadow);
+
+  const sprite = new PIXI.Sprite(texture);
+  sprite.anchor.set(0.5);
+  sprite.width = 60;
+  sprite.height = 60;
+  sprite.position.set(0, -4);
+  view.addChild(sprite);
+  view._toySprite = sprite;
+  return view;
+}
+
+function createToyHouseHeartBubble(x, y) {
+  if (!toyHouseContainer) {
+    return;
+  }
+
+  const bubble = new PIXI.Container();
+  const bg = new PIXI.Graphics();
+  bg.beginFill(0xffffff, 0.88);
+  bg.drawRoundedRect(-28, -24, 56, 42, 18);
+  bg.endFill();
+  bg.lineStyle(3, 0xff91b8, 0.72);
+  bg.drawRoundedRect(-28, -24, 56, 42, 18);
+  drawHeartShape(bg, -7, -4, 18, 0xff5f8f, 0.96);
+  drawHeartShape(bg, 12, -9, 12, 0xff9fcb, 0.9);
+  bubble.addChild(bg);
+  bubble.position.set(x, y - 58);
+  bubble.zIndex = 18;
+  toyHouseContainer.addChild(bubble);
+  toyHouseEffects.push({
+    view: bubble,
+    vx: (Math.random() - 0.5) * 0.55,
+    vy: -1.2 - Math.random() * 0.45,
+    life: 54,
+    maxLife: 54,
+  });
+}
+
+function touchToyHouseTsum(toy, event) {
+  event?.stopPropagation?.();
+  activateMobileSession();
+  playToyHouseTouchSound();
+  Body.setVelocity(toy.body, {
+    x: toy.body.velocity.x + (Math.random() - 0.5) * 3.4,
+    y: -7.2 - Math.random() * 2.2,
+  });
+  Body.setAngularVelocity(toy.body, toy.body.angularVelocity + (Math.random() - 0.5) * 0.22);
+  createToyHouseHeartBubble(toy.body.position.x, toy.body.position.y);
+  triggerHaptic(28);
+}
+
+function updateToyHouseEffects() {
+  for (let i = toyHouseEffects.length - 1; i >= 0; i -= 1) {
+    const effect = toyHouseEffects[i];
+    effect.life -= 1;
+    effect.vy -= 0.01;
+    effect.view.x += effect.vx;
+    effect.view.y += effect.vy;
+    effect.view.alpha = Math.max(0, effect.life / effect.maxLife);
+    effect.view.scale.set(0.86 + (1 - effect.view.alpha) * 0.26);
+    if (effect.life <= 0) {
+      effect.view.destroy({ children: true });
+      toyHouseEffects.splice(i, 1);
+    }
+  }
+}
+
+function updateToyHouse(now, delta) {
+  if (!toyHouseActive || !toyHouseEngine) {
+    return;
+  }
+
+  let remainingStep = Math.max(12, Math.min(delta || 16.67, 50));
+  let steps = 0;
+  while (remainingStep > 0 && steps < 3) {
+    const step = Math.min(remainingStep, 16.66);
+    Engine.update(toyHouseEngine, step);
+    remainingStep -= step;
+    steps += 1;
+  }
+  for (const toy of toyHouseTsums) {
+    if (now > toy.nextTurnAt || Math.abs(toy.targetX - toy.body.position.x) < 18) {
+      toy.targetX = clamp(
+        toy.homeX + (Math.random() - 0.5) * toy.roamRadius * 2,
+        44,
+        DESIGN_WIDTH - 44,
+      );
+      toy.direction = toy.targetX >= toy.body.position.x ? 1 : -1;
+      toy.nextTurnAt = now + 900 + Math.random() * 1800;
+    }
+
+    const targetSpeed = clamp((toy.targetX - toy.body.position.x) * 0.028, -toy.walkSpeed, toy.walkSpeed);
+    toy.direction = targetSpeed >= 0 ? 1 : -1;
+    Body.setVelocity(toy.body, {
+      x: toy.body.velocity.x + (targetSpeed - toy.body.velocity.x) * 0.035,
+      y: toy.body.velocity.y,
+    });
+
+    const grounded = toy.body.position.y >= toy.restY - 7 && Math.abs(toy.body.velocity.y) < 1.45;
+    if (grounded && now > toy.nextJumpAt) {
+      Body.setVelocity(toy.body, {
+        x: toy.body.velocity.x + toy.direction * (0.65 + Math.random() * 0.75),
+        y: -4.8 - Math.random() * 2.6,
+      });
+      Body.setAngularVelocity(toy.body, toy.body.angularVelocity + toy.direction * 0.05);
+      toy.nextJumpAt = now + 1300 + Math.random() * 2600;
+    }
+
+    toy.view.position.set(toy.body.position.x, toy.body.position.y);
+    toy.view.rotation = toy.body.angle * 0.22;
+    toy.view.zIndex = 12 + toy.body.position.y / 1000;
+    toy.view.scale.x = Math.abs(toy.view.scale.x) * (toy.direction < 0 ? -1 : 1);
+    if (toy.view._toySprite) {
+      const squash = grounded ? 1 : 1 + Math.min(0.1, Math.abs(toy.body.velocity.y) * 0.008);
+      toy.view._toySprite.scale.y = squash;
+      toy.view._toySprite.scale.x = 1 / squash;
+    }
+  }
+  updateToyHouseEffects();
+}
+
+function destroyToyHouse() {
+  if (toyHouseContainer) {
+    toyHouseContainer.destroy({ children: true });
+    toyHouseContainer = null;
+  }
+  toyHouseEngine = null;
+  toyHouseTsums = [];
+  toyHouseEffects = [];
+  toyHouseActive = false;
+}
+
+function closeToyHouse() {
+  destroyToyHouse();
+  showLevelSelect();
+}
+
+async function populateToyHouse(container, statusText) {
+  const unlockedFriendlyIds = getUnlockedFriendlySpriteIds();
+  const visibleIds = shuffle(unlockedFriendlyIds).slice(0, TOY_HOUSE_MAX_TSUMS);
+  if (statusText) {
+    statusText.text = unlockedFriendlyIds.length
+      ? `轮换 ${visibleIds.length}/${unlockedFriendlyIds.length}`
+      : "还没有已解锁的友善松松";
+  }
+  if (visibleIds.length === 0) {
+    return;
+  }
+
+  const texturesById = new Map();
+  const loadedTextures = await loadSpriteTextures(visibleIds);
+  visibleIds.forEach((id, index) => {
+    texturesById.set(id, loadedTextures[index]);
+  });
+
+  visibleIds.forEach((id, index) => {
+    const laneCount = TOY_HOUSE_LANE_FLOOR_YS.length;
+    const laneIndex = index % laneCount;
+    const col = Math.floor(index / laneCount);
+    const columns = Math.ceil(visibleIds.length / laneCount);
+    const colStep = columns > 1 ? (DESIGN_WIDTH - 104) / (columns - 1) : 0;
+    const laneFloorY = TOY_HOUSE_LANE_FLOOR_YS[laneIndex];
+    const laneFloorCategory = TOY_HOUSE_LANE_FLOOR_CATEGORIES[laneIndex];
+    const homeX = 52 + col * colStep + (laneIndex - 1) * 12;
+    const x = homeX + (Math.random() - 0.5) * 14;
+    const y = laneFloorY - 44 - Math.random() * 16;
+    const body = Bodies.circle(clamp(x, 44, DESIGN_WIDTH - 44), clamp(y, 640, laneFloorY - 2), TOY_HOUSE_BODY_RADIUS, {
+      restitution: 0.22,
+      friction: 0.018,
+      frictionStatic: 0,
+      frictionAir: 0.018,
+      density: 0.0013,
+      slop: 0.1,
+      collisionFilter: {
+        category: TOY_HOUSE_TOY_CATEGORY,
+        mask: TOY_HOUSE_WALL_CATEGORY | laneFloorCategory,
+        group: -1,
+      },
+    });
+    Body.setVelocity(body, {
+      x: (Math.random() - 0.5) * 1.8,
+      y: 0.4 + Math.random() * 1.1,
+    });
+    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.08);
+    Composite.add(toyHouseEngine.world, body);
+
+    const view = makeToyHouseTsumView(texturesById.get(id));
+    view.position.set(body.position.x, body.position.y);
+    view.zIndex = 12;
+    view.eventMode = "static";
+    view.cursor = "pointer";
+    const toy = {
+      body,
+      view,
+      spriteId: id,
+      direction: Math.random() < 0.5 ? -1 : 1,
+      homeX: clamp(homeX, 44, DESIGN_WIDTH - 44),
+      targetX: clamp(x + (Math.random() - 0.5) * 48, 44, DESIGN_WIDTH - 44),
+      roamRadius: 30 + Math.random() * 24,
+      walkSpeed: 0.72 + Math.random() * 0.56,
+      restY: laneFloorY + TOY_HOUSE_BODY_RADIUS,
+      nextTurnAt: performance.now() + 700 + Math.random() * 1700,
+      nextJumpAt: performance.now() + 900 + Math.random() * 2400,
+    };
+    view.on("pointertap", (event) => touchToyHouseTsum(toy, event));
+    container.addChild(view);
+    toyHouseTsums.push(toy);
+  });
+
+  const nextWarmIds = unlockedFriendlyIds.filter((id) => !visibleIds.includes(id)).slice(0, 36);
+  warmSpriteTextures(nextWarmIds, 6);
+}
+
+async function showToyHouse() {
+  if (toyHouseLoading || toyHouseActive) {
+    return;
+  }
+
+  toyHouseLoading = true;
+  activateMobileSession();
+  gameStarted = false;
+  pausedByMenu = false;
+  clearSelection();
+  cancelPendingHeroSkill();
+  hideResultOverlay();
+  hidePauseMenu();
+  hideCollectionBook();
+  hideLevelSelect();
+  destroyToyHouse();
+
+  toyHouseEngine = Engine.create({
+    gravity: { x: 0, y: 1.05, scale: 0.001 },
+    positionIterations: 8,
+    velocityIterations: 6,
+    constraintIterations: 3,
+  });
+
+  toyHouseContainer = new PIXI.Container();
+  toyHouseContainer.zIndex = 92;
+  toyHouseContainer.sortableChildren = true;
+  toyHouseContainer.eventMode = "static";
+  toyHouseContainer.hitArea = new PIXI.Rectangle(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+  toyHouseContainer.on("pointerdown", (event) => event.stopPropagation());
+  toyHouseContainer.on("pointermove", (event) => event.stopPropagation());
+  toyHouseContainer.on("pointerup", (event) => event.stopPropagation());
+
+  try {
+    const backgroundTexture = await loadPixiTexture(TOY_HOUSE_BACKGROUND_PATH);
+    const bg = new PIXI.Sprite(backgroundTexture);
+    fitSpriteCover(bg, DESIGN_WIDTH, DESIGN_HEIGHT);
+    bg.zIndex = 0;
+    toyHouseContainer.addChild(bg);
+
+    const shade = new PIXI.Graphics();
+    shade.beginFill(0xfff6e2, 0.08);
+    shade.drawRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+    shade.endFill();
+    shade.zIndex = 1;
+    toyHouseContainer.addChild(shade);
+
+    drawToyHouseFurniture(toyHouseContainer);
+
+    const title = new PIXI.Text("松松玩具屋", {
+      fill: 0xffffff,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 28,
+      fontWeight: "900",
+      stroke: 0x0e5e78,
+      strokeThickness: 5,
+    });
+    title.position.set(30, 58);
+    title.zIndex = 20;
+    toyHouseContainer.addChild(title);
+
+    const statusText = new PIXI.Text("准备中...", {
+      fill: 0xfff7c8,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 13,
+      fontWeight: "800",
+      stroke: 0x0b4558,
+      strokeThickness: 3,
+    });
+    statusText.position.set(34, 96);
+    statusText.zIndex = 20;
+    toyHouseContainer.addChild(statusText);
+
+    const close = createButton("返回", DESIGN_WIDTH - 102, 58, 70, 38, closeToyHouse, {
+      fill: 0x0e5e78,
+      line: 0xfff7c8,
+      lineAlpha: 0.68,
+      textFill: 0xffffff,
+      fontSize: 14,
+    });
+    close.zIndex = 21;
+    toyHouseContainer.addChild(close);
+
+    app.stage.addChild(toyHouseContainer);
+    await populateToyHouse(toyHouseContainer, statusText);
+    toyHouseActive = true;
+    warmGameplayTextureWindow();
+  } catch (error) {
+    destroyToyHouse();
+    throw error;
+  } finally {
+    toyHouseLoading = false;
+  }
+}
+
 function makeStarParticle(x, y) {
   const star = new PIXI.Graphics();
   const points = [];
@@ -2677,6 +3159,11 @@ function setupAudio() {
   popBigSound.volume = 0.9;
   popBigSound.load();
 
+  toyTouchSound = new Audio(TOY_TOUCH_SOUND_PATH);
+  toyTouchSound.preload = "auto";
+  toyTouchSound.volume = 0.62;
+  toyTouchSound.load();
+
   loadSoundBuffers().catch(() => {});
 }
 
@@ -2997,10 +3484,7 @@ async function setupBossForLevel() {
   aura.drawCircle(0, 0, 96);
   bossContainer.addChild(aura);
 
-  let texture = PIXI.Texture.WHITE;
-  if (PIXI.Assets && PIXI.Assets.load) {
-    texture = await PIXI.Assets.load(`assets/${boss.assetId}.png`).catch(() => PIXI.Texture.WHITE);
-  }
+  const texture = await loadSpriteTexture(boss.assetId).catch(() => PIXI.Texture.WHITE);
   bossSprite = new PIXI.Sprite(texture);
   bossSprite.anchor.set(0.5);
   bossSprite.width = 156;
@@ -4173,6 +4657,17 @@ function showLevelSelect() {
   title.position.set(34, 78);
   levelSelectContainer.addChild(title);
 
+  const toyHouse = createButton("玩具屋", DESIGN_WIDTH - 128, 80, 94, 38, () => {
+    showToyHouse().catch(showFatalError);
+  }, {
+    fill: 0x2d5f58,
+    line: 0x73f7cf,
+    lineAlpha: 0.72,
+    textFill: 0xfff7c8,
+    fontSize: 14,
+  });
+  levelSelectContainer.addChild(toyHouse);
+
   const pageCount = Math.ceil(LEVELS.length / LEVELS_PER_PAGE);
   levelSelectPage = Math.max(0, Math.min(levelSelectPage, pageCount - 1));
   const startIndex = levelSelectPage * LEVELS_PER_PAGE;
@@ -4335,6 +4830,7 @@ function showLevelSelect() {
 
   app.stage.addChild(levelSelectContainer);
   updateHudForLevel();
+  warmGameplayTextureWindow();
 }
 
 function hideResultOverlay() {
@@ -4400,6 +4896,11 @@ function showResultOverlay(passed) {
   const nextLevel = passed && !isSprint && currentLevel
     ? LEVELS.find((level) => level.id === currentLevel.id + 1)
     : null;
+  if (nextLevel) {
+    loadLevelObstacleTextures(nextLevel).catch(() => {});
+  }
+  warmGameplayTextureWindow();
+
   const nextLabel = nextLevel ? "下一关" : "关卡";
   const next = createButton(nextLabel, 232, 444, 132, 52, () => {
     if (nextLevel) {
@@ -4455,6 +4956,10 @@ function startTicker() {
     const now = performance.now();
     const delta = lastTimestamp === 0 ? 0 : now - lastTimestamp;
     lastTimestamp = now;
+
+    if (toyHouseActive) {
+      updateToyHouse(now, delta);
+    }
 
     if (gameStarted && !pausedByMenu) {
       if (Number.isFinite(levelTimeLeftMs)) {
@@ -4512,6 +5017,7 @@ window.__tsumDebug = {
       startLevel(level).catch(showFatalError);
     }
   },
+  showToyHouse: () => showToyHouse().catch(showFatalError),
   removeBallsForTest: (count = 3) => {
     const removing = balls.slice(0, Math.max(0, Math.min(count, balls.length)));
     return removeBalls(removing);
@@ -4527,6 +5033,8 @@ window.__tsumDebug = {
     obstacleCount: levelObstacleViews.length,
     obstacleHp: levelObstacleViews.map((view) => view._hp ?? null),
     pendingRefillCount,
+    toyHouseActive,
+    toyHouseTsums: toyHouseTsums.length,
   }),
 };
 

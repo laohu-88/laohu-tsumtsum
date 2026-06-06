@@ -1,9 +1,9 @@
-const CACHE_NAME = "laohu-tsumtsum-v57";
+const CACHE_NAME = "laohu-tsumtsum-v60";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./game.js",
-  "./game.js?v=57",
+  "./game.js?v=60",
   "./character-alignments.json",
   "./manifest.json",
   "./manifest.json?v=45",
@@ -15,6 +15,8 @@ const CORE_ASSETS = [
   "./pop.wav",
   "./pop_bomb.wav",
   "./pop_big.wav",
+  "./toy_touch.wav",
+  "./toy_touch.wav?v=1",
   "./collection-catalog.json",
   "./collection-catalog.json?v=3",
   "./collection-character-assets.json",
@@ -36,6 +38,8 @@ const CORE_ASSETS = [
   "./sszdy_assets/Texture2D_Texture2D_69810.png?v=57",
   "./sszdy_assets/Sprite_Sprite_69967.png?v=57",
   "./sszdy_assets/Texture2D_Texture2D_69921.png?v=57",
+  "./sszdy_assets/Texture2D_Texture2D_8066.png",
+  "./sszdy_assets/Texture2D_Texture2D_8066.png?v=60",
 ];
 
 self.addEventListener("install", (event) => {
