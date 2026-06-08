@@ -1,46 +1,70 @@
-const CACHE_NAME = "laohu-tsumtsum-v60";
+const CACHE_NAME = "laohu-tsumtsum-v62";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./game.js",
-  "./game.js?v=60",
-  "./character-alignments.json",
-  "./manifest.json",
+  "./game.js?v=62",
   "./manifest.json?v=45",
   "./vendor/pixi.min.js",
   "./vendor/matter.min.js",
-  "./connect.wav",
-  "./connect.wav?v=11",
-  "./link.wav",
-  "./pop.wav",
-  "./pop_bomb.wav",
-  "./pop_big.wav",
-  "./toy_touch.wav",
-  "./toy_touch.wav?v=1",
-  "./collection-catalog.json",
-  "./collection-catalog.json?v=3",
-  "./collection-character-assets.json",
-  "./collection-character-assets.json?v=2",
-  "./icons/icon-192.png",
   "./icons/icon-192.png?v=45",
-  "./icons/icon-512.png",
   "./icons/icon-512.png?v=45",
-  "./sszdy_assets/Sprite_Sprite_69871.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_69802.png?v=57",
-  "./sszdy_assets/Sprite_Sprite_70061.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_70000.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_69904.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_69838.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_69887.png?v=57",
-  "./sszdy_assets/Sprite_Sprite_69882.png?v=57",
-  "./sszdy_assets/Sprite_Sprite_69965.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_69844.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_69810.png?v=57",
-  "./sszdy_assets/Sprite_Sprite_69967.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_69921.png?v=57",
-  "./sszdy_assets/Texture2D_Texture2D_8066.png",
-  "./sszdy_assets/Texture2D_Texture2D_8066.png?v=60",
 ];
+
+const CACHE_FIRST_DESTINATIONS = new Set(["image", "audio", "font"]);
+const CACHE_FIRST_EXTENSIONS = /\.(?:png|webp|jpg|jpeg|gif|svg|wav|mp3|ogg|m4a)$/i;
+
+function isSameOrigin(request) {
+  return new URL(request.url).origin === self.location.origin;
+}
+
+function isCacheFirstRequest(request) {
+  if (!isSameOrigin(request)) {
+    return false;
+  }
+
+  const url = new URL(request.url);
+  return CACHE_FIRST_DESTINATIONS.has(request.destination) || CACHE_FIRST_EXTENSIONS.test(url.pathname);
+}
+
+async function putInCache(request, response) {
+  if (!response || !response.ok) {
+    return;
+  }
+  const cache = await caches.open(CACHE_NAME);
+  await cache.put(request, response.clone());
+}
+
+async function fetchAndCache(request) {
+  const response = await fetch(request);
+  putInCache(request, response).catch(() => {});
+  return response;
+}
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) {
+    return cached;
+  }
+  return fetchAndCache(request);
+}
+
+async function networkFirst(request, fallbackRequest = null) {
+  try {
+    return await fetchAndCache(request);
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) {
+      return cached;
+    }
+    if (fallbackRequest) {
+      const fallback = await caches.match(fallbackRequest);
+      if (fallback) {
+        return fallback;
+      }
+    }
+    return Response.error();
+  }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -66,29 +90,14 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (event.request.mode === "navigate" || event.request.destination === "document") {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html"))),
-    );
+    event.respondWith(networkFirst(event.request, "./index.html"));
     return;
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || Response.error())),
-  );
+  if (isCacheFirstRequest(event.request)) {
+    event.respondWith(cacheFirst(event.request).catch(() => Response.error()));
+    return;
+  }
+
+  event.respondWith(networkFirst(event.request));
 });

@@ -53,6 +53,11 @@ const HERO_MAX_ENERGY = 100;
 const LEVELS_PER_PAGE = 10;
 const HERO_PANEL_Y = DESIGN_HEIGHT - 130;
 const INITIAL_BOARD_FILL_TARGET = 32;
+const SPRITE_TEXTURE_SOFT_TIMEOUT_MS = 3600;
+const SCENE_TEXTURE_SOFT_TIMEOUT_MS = 5200;
+const COLLECTION_GRID_BATCH_SIZE = 28;
+const COLLECTION_BATCH_DELAY_MS = 18;
+const TOY_HOUSE_ROOM_LOAD_BATCH_SIZE = 8;
 
 const VILLAIN_SPRITE_IDS = [
   19, 22, 34, 37, 39, 42, 55, 63, 67, 72, 73, 74, 75, 80, 82, 90, 105, 121, 139, 141, 147, 183, 199, 203,
@@ -649,6 +654,7 @@ let levelStartInProgress = false;
 let lastCoinsEarned = 0;
 let spriteTextureCache = new Map();
 let spriteTextureLoadPromises = new Map();
+let fallbackSpriteTextureCache = new Map();
 let sceneTextureCache = new Map();
 let sceneTextureLoadPromises = new Map();
 let textureWarmupCursor = 0;
@@ -1113,6 +1119,81 @@ async function loadPixiTexture(path) {
   return promise;
 }
 
+function withSoftTimeout(promise, timeoutMs, label = "asset") {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return promise;
+  }
+
+  let timeoutId = 0;
+  return new Promise((resolve, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(`${label} load timed out`));
+    }, timeoutMs);
+    promise
+      .then(resolve, reject)
+      .finally(() => window.clearTimeout(timeoutId));
+  });
+}
+
+function getFallbackSpriteTexture(id) {
+  const normalizedId = normalizeSpriteId(id) || FIRST_SPRITE_ID;
+  if (fallbackSpriteTextureCache.has(normalizedId)) {
+    return fallbackSpriteTextureCache.get(normalizedId);
+  }
+
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  const hue = Math.floor(seededRandom(normalizedId) * 360);
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = `hsl(${hue}, 72%, 58%)`;
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size * 0.43, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.beginPath();
+  ctx.arc(size * 0.38, size * 0.43, size * 0.075, 0, Math.PI * 2);
+  ctx.arc(size * 0.62, size * 0.43, size * 0.075, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.82)";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(size / 2, size * 0.57, size * 0.17, 0.12 * Math.PI, 0.88 * Math.PI);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(13,22,32,0.74)";
+  ctx.font = "700 20px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(normalizedId), size / 2, size * 0.83);
+
+  const texture = PIXI.Texture.from(canvas);
+  fallbackSpriteTextureCache.set(normalizedId, texture);
+  return texture;
+}
+
+async function loadSpriteTextureWithFallback(id, timeoutMs = SPRITE_TEXTURE_SOFT_TIMEOUT_MS) {
+  const normalizedId = normalizeSpriteId(id);
+  if (!normalizedId) {
+    return getFallbackSpriteTexture(FIRST_SPRITE_ID);
+  }
+
+  try {
+    return await withSoftTimeout(loadSpriteTexture(normalizedId), timeoutMs, `sprite ${normalizedId}`);
+  } catch {
+    return getFallbackSpriteTexture(normalizedId);
+  }
+}
+
+async function loadPixiTextureWithFallback(path, fallbackTexture = PIXI.Texture.WHITE, timeoutMs = SCENE_TEXTURE_SOFT_TIMEOUT_MS) {
+  try {
+    return await withSoftTimeout(loadPixiTexture(path), timeoutMs, path);
+  } catch {
+    return fallbackTexture;
+  }
+}
+
 async function loadSpriteTexture(id) {
   if (spriteTextureCache.has(id)) {
     return spriteTextureCache.get(id);
@@ -1132,8 +1213,12 @@ async function loadSpriteTexture(id) {
   return promise;
 }
 
-async function loadSpriteTextures(ids) {
-  return Promise.all(ids.map((id) => loadSpriteTexture(id)));
+async function loadSpriteTextures(ids, options = {}) {
+  const fallback = options.fallback === true;
+  const timeoutMs = options.timeoutMs ?? SPRITE_TEXTURE_SOFT_TIMEOUT_MS;
+  return Promise.all(ids.map((id) => (
+    fallback ? loadSpriteTextureWithFallback(id, timeoutMs) : loadSpriteTexture(id)
+  )));
 }
 
 function warmSpriteTextures(ids, batchSize = 6) {
@@ -1170,7 +1255,7 @@ function warmGameplayTextureWindow() {
 
 async function loadRoundTextures() {
   selectedSpriteIds = pickRoundSprites();
-  const loadedTextures = await loadSpriteTextures(selectedSpriteIds);
+  const loadedTextures = await loadSpriteTextures(selectedSpriteIds, { fallback: true });
 
   textures = selectedSpriteIds.map((id, index) => ({
     id,
@@ -1191,7 +1276,7 @@ async function loadHeroTexture() {
     return;
   }
 
-  selectedHeroTexture = await loadSpriteTexture(selectedHero.assetId);
+  selectedHeroTexture = await loadSpriteTextureWithFallback(selectedHero.assetId);
   heroTextures.set(selectedHero.id, selectedHeroTexture);
 }
 
@@ -1202,7 +1287,7 @@ async function loadLevelObstacleTextures(level) {
   }
 
   await Promise.all([...assetIds].map(async (id) => {
-    const texture = await loadSpriteTexture(id).catch(() => null);
+    const texture = await loadSpriteTextureWithFallback(id, SPRITE_TEXTURE_SOFT_TIMEOUT_MS).catch(() => null);
     if (texture) {
       obstacleTextures.set(id, texture);
     }
@@ -1211,7 +1296,7 @@ async function loadLevelObstacleTextures(level) {
 
 async function loadHeroTextures() {
   await Promise.all(HEROES.map(async (hero) => {
-    const texture = await loadSpriteTexture(hero.assetId);
+    const texture = await loadSpriteTextureWithFallback(hero.assetId);
     heroTextures.set(hero.id, texture);
   }));
   selectedHeroTexture = heroTextures.get(selectedHero.id) || selectedHeroTexture;
@@ -1399,6 +1484,18 @@ function ensureCollectionStyles() {
       height: 82%;
       object-fit: contain;
       display: block;
+    }
+    .collection-locked-mark {
+      width: 58%;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: rgba(255, 255, 255, 0.72);
+      background: radial-gradient(circle at 38% 28%, rgba(255, 255, 255, 0.2), rgba(0, 0, 0, 0.36));
+      font-size: 24px;
+      font-weight: 900;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
     }
     .collection-card.locked img {
       filter: grayscale(100%) brightness(0);
@@ -2666,11 +2763,11 @@ async function loadToyHouseTsumTexture(id, catalogMap) {
   const item = getToyHouseCatalogItem(id, catalogMap);
   const bucketPath = getToyHouseBucketAssetPath(item);
   if (bucketPath) {
-    const texture = await loadPixiTexture(bucketPath);
+    const texture = await loadPixiTextureWithFallback(bucketPath, getFallbackSpriteTexture(id));
     return { id, texture, isBucket: true };
   }
 
-  const texture = await loadSpriteTexture(id);
+  const texture = await loadSpriteTextureWithFallback(id);
   return { id, texture, isBucket: false };
 }
 
@@ -3087,6 +3184,67 @@ function updateToyHouseRoomUi() {
   }
 }
 
+function addToyHouseTsumEntry(entry, index, layout) {
+  if (!toyHouseEngine || !toyHouseRoomLayer) {
+    return;
+  }
+
+  const col = index % layout.columns;
+  const row = Math.floor(index / layout.columns);
+  const homeX = 46 + col * layout.colStep;
+  const x = homeX + (Math.random() - 0.5) * 12;
+  const y = layout.startY + row * layout.rowStep + (Math.random() - 0.5) * 10;
+  const body = Bodies.rectangle(
+    clamp(x, 28, DESIGN_WIDTH - 28),
+    clamp(y, 170, TOY_HOUSE_FLOOR_Y - 70),
+    TOY_HOUSE_BODY_WIDTH,
+    TOY_HOUSE_BODY_HEIGHT,
+    {
+      restitution: 0.14,
+      friction: 0.42,
+      frictionStatic: 0.64,
+      frictionAir: 0.024,
+      density: 0.00145,
+      slop: 0.06,
+      chamfer: { radius: 12 },
+      collisionFilter: {
+        category: TOY_HOUSE_TOY_CATEGORY,
+        mask: TOY_HOUSE_WALL_CATEGORY | TOY_HOUSE_TOY_CATEGORY,
+      },
+    },
+  );
+  Body.setVelocity(body, {
+    x: (Math.random() - 0.5) * 1.2,
+    y: 0.25 + Math.random() * 0.8,
+  });
+  Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.05);
+  Composite.add(toyHouseEngine.world, body);
+
+  const view = makeToyHouseTsumView(entry.texture, entry.isBucket);
+  view.position.set(body.position.x, body.position.y);
+  view.zIndex = 12;
+  view.eventMode = "static";
+  view.cursor = "pointer";
+  const toy = {
+    body,
+    view,
+    spriteId: entry.id,
+    direction: Math.random() < 0.5 ? -1 : 1,
+    homeX: clamp(homeX, 34, DESIGN_WIDTH - 34),
+    targetX: clamp(x + (Math.random() - 0.5) * 48, 34, DESIGN_WIDTH - 34),
+    roamRadius: 24 + Math.random() * 22,
+    walkSpeed: 0.36 + Math.random() * 0.38,
+    nextTurnAt: layout.now + 900 + Math.random() * 2100,
+    nextJumpAt: layout.now + 1100 + Math.random() * 2800,
+    nextCakeJumpAt: layout.now + 1600 + Math.random() * 5200,
+    manualUntil: layout.now + 1300 + Math.random() * 1200,
+    isDragged: false,
+  };
+  view.on("pointerdown", (event) => startToyHouseDrag(toy, event));
+  toyHouseRoomLayer.addChild(view);
+  toyHouseTsums.push(toy);
+}
+
 function destroyToyHouse() {
   clearToyHouseRoom();
   if (toyHouseContainer) {
@@ -3128,74 +3286,48 @@ async function populateToyHouseRoom(roomIndex) {
   updateToyHouseRoomUi();
 
   const catalogMap = await loadCollectionCatalog();
-  const loaded = await Promise.all(room.ids.map((id) => loadToyHouseTsumTexture(id, catalogMap)));
   if (token !== toyHouseRoomRenderToken || !toyHouseRoomLayer || !toyHouseEngine) {
     return;
   }
 
-  const count = loaded.length;
+  const count = room.ids.length;
   const columns = clamp(Math.ceil(Math.sqrt(Math.max(1, count) * 1.45)), 5, 9);
   const colStep = columns > 1 ? (DESIGN_WIDTH - 92) / (columns - 1) : 0;
-  const rowStep = 43;
-  const startY = count > 26 ? 356 : 430;
-  const now = performance.now();
+  const layout = {
+    columns,
+    colStep,
+    rowStep: 43,
+    startY: count > 26 ? 356 : 430,
+    now: performance.now(),
+  };
 
-  loaded.forEach((entry, index) => {
-    const col = index % columns;
-    const row = Math.floor(index / columns);
-    const homeX = 46 + col * colStep;
-    const x = homeX + (Math.random() - 0.5) * 12;
-    const y = startY + row * rowStep + (Math.random() - 0.5) * 10;
-    const body = Bodies.rectangle(
-      clamp(x, 28, DESIGN_WIDTH - 28),
-      clamp(y, 170, TOY_HOUSE_FLOOR_Y - 70),
-      TOY_HOUSE_BODY_WIDTH,
-      TOY_HOUSE_BODY_HEIGHT,
-      {
-        restitution: 0.14,
-        friction: 0.42,
-        frictionStatic: 0.64,
-        frictionAir: 0.024,
-        density: 0.00145,
-        slop: 0.06,
-        chamfer: { radius: 12 },
-        collisionFilter: {
-          category: TOY_HOUSE_TOY_CATEGORY,
-          mask: TOY_HOUSE_WALL_CATEGORY | TOY_HOUSE_TOY_CATEGORY,
-        },
-      },
-    );
-    Body.setVelocity(body, {
-      x: (Math.random() - 0.5) * 1.2,
-      y: 0.25 + Math.random() * 0.8,
+  if (toyHouseStatusText) {
+    toyHouseStatusText.text = `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · 正在放入 0/${count}`;
+  }
+
+  for (let start = 0; start < room.ids.length; start += TOY_HOUSE_ROOM_LOAD_BATCH_SIZE) {
+    const batch = room.ids.slice(start, start + TOY_HOUSE_ROOM_LOAD_BATCH_SIZE);
+    const loaded = await Promise.all(batch.map((id) => (
+      loadToyHouseTsumTexture(id, catalogMap).catch(() => ({
+        id,
+        texture: getFallbackSpriteTexture(id),
+        isBucket: false,
+      }))
+    )));
+    if (token !== toyHouseRoomRenderToken || !toyHouseRoomLayer || !toyHouseEngine) {
+      return;
+    }
+
+    loaded.forEach((entry, batchIndex) => {
+      addToyHouseTsumEntry(entry, start + batchIndex, layout);
     });
-    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.05);
-    Composite.add(toyHouseEngine.world, body);
+    if (toyHouseStatusText) {
+      toyHouseStatusText.text = `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · 正在放入 ${Math.min(start + loaded.length, count)}/${count}`;
+    }
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  }
 
-    const view = makeToyHouseTsumView(entry.texture, entry.isBucket);
-    view.position.set(body.position.x, body.position.y);
-    view.zIndex = 12;
-    view.eventMode = "static";
-    view.cursor = "pointer";
-    const toy = {
-      body,
-      view,
-      spriteId: entry.id,
-      direction: Math.random() < 0.5 ? -1 : 1,
-      homeX: clamp(homeX, 34, DESIGN_WIDTH - 34),
-      targetX: clamp(x + (Math.random() - 0.5) * 48, 34, DESIGN_WIDTH - 34),
-      roamRadius: 24 + Math.random() * 22,
-      walkSpeed: 0.36 + Math.random() * 0.38,
-      nextTurnAt: now + 900 + Math.random() * 2100,
-      nextJumpAt: now + 1100 + Math.random() * 2800,
-      nextCakeJumpAt: now + 1600 + Math.random() * 5200,
-      manualUntil: now + 1300 + Math.random() * 1200,
-      isDragged: false,
-    };
-    view.on("pointerdown", (event) => startToyHouseDrag(toy, event));
-    toyHouseRoomLayer.addChild(view);
-    toyHouseTsums.push(toy);
-  });
+  updateToyHouseRoomUi();
 
   const warmIds = getUnlockedToyHouseSpriteIds().filter((id) => !room.ids.includes(id)).slice(0, 48);
   warmSpriteTextures(warmIds, 6);
@@ -3250,8 +3382,8 @@ async function showToyHouse() {
 
   try {
     const [backgroundTexture, cakeTexture, catalogMap] = await Promise.all([
-      loadPixiTexture(TOY_HOUSE_BACKGROUND_PATH),
-      loadPixiTexture(TOY_HOUSE_CAKE_PLATFORM_PATH).catch(() => null),
+      loadPixiTextureWithFallback(TOY_HOUSE_BACKGROUND_PATH),
+      loadPixiTextureWithFallback(TOY_HOUSE_CAKE_PLATFORM_PATH, null).catch(() => null),
       loadCollectionCatalog(),
     ]);
     const bg = new PIXI.Sprite(backgroundTexture);
@@ -4061,7 +4193,7 @@ async function setupBossForLevel() {
   aura.drawCircle(0, 0, 96);
   bossContainer.addChild(aura);
 
-  const texture = await loadSpriteTexture(boss.assetId).catch(() => PIXI.Texture.WHITE);
+  const texture = await loadSpriteTextureWithFallback(boss.assetId).catch(() => PIXI.Texture.WHITE);
   bossSprite = new PIXI.Sprite(texture);
   bossSprite.anchor.set(0.5);
   bossSprite.width = 156;
@@ -4632,7 +4764,19 @@ function refreshCollectionGrid() {
   const cards = collectionGrid.querySelectorAll("[data-sprite-id]");
   cards.forEach((card) => {
     const id = normalizeSpriteId(card.getAttribute("data-sprite-id"));
-    card.classList.toggle("locked", !unlockedSprites.has(id));
+    if (!id) {
+      return;
+    }
+    const unlocked = unlockedSprites.has(id);
+    card.classList.toggle("locked", !unlocked);
+    updateCollectionCardIdentity(card, id);
+    if (unlocked && !card.querySelector("img")) {
+      const mark = card.querySelector(".collection-locked-mark");
+      if (mark) {
+        mark.remove();
+      }
+      card.insertBefore(createCollectionThumbnail(id, getCollectionName(id)), card.firstChild);
+    }
   });
   if (collectionFilter !== "all") {
     renderCollectionGrid();
@@ -4714,6 +4858,49 @@ function getCollectionName(id) {
   return getCollectionCatalogEntry(id)?.name || `No.${id}`;
 }
 
+function createCollectionThumbnail(id, name) {
+  const image = document.createElement("img");
+  image.src = `assets/${id}.png`;
+  image.alt = name;
+  image.loading = "lazy";
+  image.decoding = "async";
+  return image;
+}
+
+function createCollectionLockedMark() {
+  const mark = document.createElement("div");
+  mark.className = "collection-locked-mark";
+  mark.textContent = "?";
+  return mark;
+}
+
+function updateCollectionCardIdentity(card, id) {
+  const name = getCollectionName(id);
+  card.setAttribute("aria-label", `${name} 松松`);
+  const label = card.querySelector("span");
+  if (label) {
+    label.textContent = name;
+    label.title = name;
+  }
+  const image = card.querySelector("img");
+  if (image) {
+    image.alt = name;
+  }
+}
+
+function refreshCollectionNames() {
+  if (!collectionGrid) {
+    return;
+  }
+
+  collectionGrid.querySelectorAll("[data-sprite-id]").forEach((card) => {
+    const id = normalizeSpriteId(card.getAttribute("data-sprite-id"));
+    if (id) {
+      updateCollectionCardIdentity(card, id);
+    }
+  });
+}
+
 function createDetailImage(src, alt, fallbackSrc = "") {
   const image = document.createElement("img");
   image.src = src;
@@ -4749,7 +4936,7 @@ function renderCollectionGrid() {
   const token = collectionRenderToken;
   const ids = getCollectionIdsForFilter();
   let index = 0;
-  const batchSize = 42;
+  const batchSize = COLLECTION_GRID_BATCH_SIZE;
   collectionGrid.textContent = "";
 
   if (!ids.length) {
@@ -4773,7 +4960,7 @@ function renderCollectionGrid() {
     collectionGrid.appendChild(fragment);
 
     if (index < ids.length) {
-      window.requestAnimationFrame(appendBatch);
+      window.setTimeout(() => window.requestAnimationFrame(appendBatch), COLLECTION_BATCH_DELAY_MS);
     }
   };
 
@@ -4788,12 +4975,11 @@ function createCollectionCard(id) {
   const name = getCollectionName(id);
   card.setAttribute("aria-label", `${name} 松松`);
 
-  const image = document.createElement("img");
-  image.src = `assets/${id}.png`;
-  image.alt = name;
-  image.loading = "lazy";
-  image.decoding = "async";
-  card.appendChild(image);
+  if (unlockedSprites.has(id)) {
+    card.appendChild(createCollectionThumbnail(id, name));
+  } else {
+    card.appendChild(createCollectionLockedMark());
+  }
 
   const label = document.createElement("span");
   label.textContent = name;
@@ -4979,7 +5165,7 @@ function showCollectionBook() {
   document.body.appendChild(collectionOverlay);
   updateCoinsUi();
   renderCollectionGrid();
-  loadCollectionCatalog().then(() => renderCollectionGrid());
+  loadCollectionCatalog().then(() => refreshCollectionNames());
   setCollectionMessage(`抽中后会点亮对应松松，重复返还 ${DUPLICATE_REFUND} 金币`);
 }
 
@@ -5631,12 +5817,18 @@ async function main() {
   setupInput();
   startPhysics();
   startTicker();
-  await loadHeroTextures();
+  await loadHeroTexture();
   showLevelSelect();
 
   if (loadingEl) {
     loadingEl.style.display = "none";
   }
+
+  loadHeroTextures().then(() => {
+    if (levelSelectContainer?.visible !== false && !gameStarted && !toyHouseActive) {
+      showLevelSelect();
+    }
+  }).catch(() => {});
 }
 
 main().catch(showFatalError);
