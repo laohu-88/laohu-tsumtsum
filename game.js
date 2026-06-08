@@ -24,6 +24,7 @@ const TOY_TOUCH_SOUND_PATH = "toy_touch.wav?v=1";
 const COLLECTION_CATALOG_PATH = "collection-catalog.json?v=3";
 const COLLECTION_CHARACTER_ASSET_PATH = "collection-character-assets.json?v=2";
 const TOY_HOUSE_BACKGROUND_PATH = "sszdy_assets/Texture2D_Texture2D_8066.png?v=60";
+const TOY_HOUSE_CAKE_PLATFORM_PATH = "sszdy_assets/Sprite_Sprite_68757.png?v=61";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 118;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
@@ -61,13 +62,196 @@ const VILLAIN_SPRITE_IDS = [
 const VILLAIN_SPRITE_ID_SET = new Set(VILLAIN_SPRITE_IDS);
 const FRIENDLY_SPRITE_IDS = allSpriteIds().filter((id) => !VILLAIN_SPRITE_ID_SET.has(id));
 const FRIENDLY_SPRITE_ID_SET = new Set(FRIENDLY_SPRITE_IDS);
-const TOY_HOUSE_MAX_TSUMS = 12;
-const TOY_HOUSE_FLOOR_Y = 900;
-const TOY_HOUSE_BODY_RADIUS = 23;
+const TOY_HOUSE_FLOOR_Y = 894;
+const TOY_HOUSE_BODY_WIDTH = 38;
+const TOY_HOUSE_BODY_HEIGHT = 30;
+const TOY_HOUSE_SPRITE_MAX_WIDTH = 52;
+const TOY_HOUSE_SPRITE_MAX_HEIGHT = 50;
+const TOY_HOUSE_FALLBACK_SPRITE_SIZE = 42;
+const TOY_HOUSE_CAKE_X = DESIGN_WIDTH / 2;
+const TOY_HOUSE_CAKE_Y = 744;
+const TOY_HOUSE_CAKE_WIDTH = 252;
+const TOY_HOUSE_CAKE_SURFACE_Y = 720;
+const TOY_HOUSE_CAKE_SURFACE_WIDTH = 206;
+const TOY_HOUSE_PLAY_TOP_Y = 190;
 const TOY_HOUSE_WALL_CATEGORY = 0x0001;
 const TOY_HOUSE_TOY_CATEGORY = 0x0002;
-const TOY_HOUSE_LANE_FLOOR_CATEGORIES = [0x0004, 0x0008, 0x0010];
-const TOY_HOUSE_LANE_FLOOR_YS = [704, 760, 816];
+
+const TOY_HOUSE_MODIFIER_PREFIXES = [
+  "3rd Anniversary",
+  "Adventure",
+  "Anniversary",
+  "Autumn",
+  "Castle",
+  "Christmas",
+  "Easter",
+  "Frozen II",
+  "Halloween",
+  "Holiday",
+  "Holidy",
+  "Music",
+  "Princess",
+  "Special",
+  "Spring Day",
+  "Spring day",
+  "Spring",
+  "Summer Day",
+  "Summer day",
+  "Summer",
+  "Tea Party",
+  "Winter",
+];
+
+const TOY_HOUSE_BASE_NAME_ALIASES = {
+  "22": "22",
+  auto: "AUTO",
+  "alberto monster": "Alberto Scorfano",
+  "belle alpha": "Belle",
+  "belle gray": "Belle",
+  "bunny pancake": "Bunny",
+  "captain bmc crea": "Captain BMc Crea",
+  "captain boun": "Captain Boun",
+  cat: "Cat Milkshake",
+  "cat milkshake": "Cat Milkshake",
+  "charles f muntz": "Charles F. Muntz",
+  "daisy": "Daisy Duck",
+  "dale 1": "Dale",
+  "dela cruz": "Dela Cruz",
+  "donald": "Donald Duck",
+  "fairy god mother": "Fairy Godmother",
+  "finnick elephant": "Finnick",
+  "fire spirit": "Fire Spirit",
+  frufru: "Fru Fru",
+  "heart queen": "Queen of Hearts",
+  hector: "Hector Rivera",
+  "hector skill": "Hector Rivera",
+  "hiro": "Hiro Hamada",
+  "king rapunzel": "Rapunzel",
+  "littlenoi": "Littlenoi",
+  "luca monster": "Luca Paguro",
+  marshmellow: "Marshmellow",
+  "maui skill": "Maui",
+  "mo 2": "Mo",
+  "mr big": "Mr Big",
+  nick: "Nick Wilde",
+  "oswald back": "Oswald the Lucky Rabbit",
+  princ: "Prince Charming",
+  queen: "Queen of Hearts",
+  "queen rapunzel": "Rapunzel",
+  ralph: "Wreck-It Ralph",
+  "ralph zilla": "Wreck-It Ralph",
+  rat: "Rat",
+  "sea turtle": "Sea Turtle",
+  shanyu: "Shanyu",
+  "skill angel": "Angel",
+  "skill snow white": "Snow White",
+  "sisudatu": "Sisudatu",
+  "spautumn dumbo": "Dumbo",
+  "spautumn hiro": "Hiro Hamada",
+  "spautumn ralph": "Wreck-It Ralph",
+  "spchristmas anna": "Anna",
+  "spchristmas elsa": "Elsa",
+  "spchristmas olaf": "Olaf",
+  "spholidy chip": "Chip",
+  "spholidy daisy": "Daisy Duck",
+  "spholidy dale": "Dale",
+  "spholidy donald": "Donald Duck",
+  "spholidy minnie": "Minnie Mouse",
+  "spring chip": "Chip",
+  "spring dale": "Dale",
+  "spring donald": "Donald Duck",
+  "spring mickey mouse": "Mickey Mouse",
+  "spring tigger": "Tigger",
+  "the blue fairy": "The Blue Fairy",
+  "tow mater": "Tow Mater",
+  "tremaine cat": "Tremaine Cat",
+  "tumper": "Tumper",
+};
+
+const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
+  "alice": "sszdy_assets/Sprite_Sprite_68736.png?v=61",
+  "anna": "sszdy_assets/Sprite_Sprite_68456.png?v=61",
+  "beast": "sszdy_assets/Sprite_Sprite_68586.png?v=61",
+  "belle": "sszdy_assets/Sprite_Sprite_68604.png?v=61",
+  "cheshire cat": "sszdy_assets/Sprite_Sprite_68348.png?v=61",
+  "clawhauser": "sszdy_assets/Sprite_Sprite_68556.png?v=61",
+  "cogsworth": "sszdy_assets/Sprite_Sprite_68629.png?v=61",
+  "daisy duck": "sszdy_assets/Sprite_Sprite_68576.png?v=61",
+  "donald duck": "sszdy_assets/Sprite_Sprite_68520.png?v=61",
+  "dumbo": "sszdy_assets/Sprite_Sprite_68389.png?v=61",
+  "eeyore": "sszdy_assets/Sprite_Sprite_68694.png?v=61",
+  "elsa": "sszdy_assets/Sprite_Sprite_68448.png?v=61",
+  "finnick": "sszdy_assets/Sprite_Sprite_68544.png?v=61",
+  "flash": "sszdy_assets/Sprite_Sprite_68534.png?v=61",
+  "goofy": "sszdy_assets/Sprite_Sprite_68372.png?v=61",
+  "kristoff": "sszdy_assets/Sprite_Sprite_68491.png?v=61",
+  "lumiere": "sszdy_assets/Sprite_Sprite_68609.png?v=61",
+  "mad hatter": "sszdy_assets/Sprite_Sprite_68334.png?v=61",
+  "merida": "sszdy_assets/Sprite_Sprite_68718.png?v=61",
+  "mickey mouse": "sszdy_assets/Sprite_Sprite_68322.png?v=61",
+  "minnie mouse": "sszdy_assets/Sprite_Sprite_68435.png?v=61",
+  "mrs potts": "sszdy_assets/Sprite_Sprite_68630.png?v=61",
+  "nick wilde": "sszdy_assets/Sprite_Sprite_68516.png?v=61",
+  "olaf": "sszdy_assets/Sprite_Sprite_68467.png?v=61",
+  "piglet": "sszdy_assets/Sprite_Sprite_68663.png?v=61",
+  "pluto": "sszdy_assets/Sprite_Sprite_68379.png?v=61",
+  "rabbit": "sszdy_assets/Sprite_Sprite_68403.png?v=61",
+  "sven": "sszdy_assets/Sprite_Sprite_68476.png?v=61",
+  "tigger": "sszdy_assets/Sprite_Sprite_68681.png?v=61",
+  "white rabbit": "sszdy_assets/Sprite_Sprite_68359.png?v=61",
+  "winnie the pooh": "sszdy_assets/Sprite_Sprite_68660.png?v=61",
+};
+
+const TOY_HOUSE_ROOM_DEFINITIONS = [
+  { key: "mickey", name: "米奇和朋友", aliases: ["Mickey Mouse", "Minnie Mouse", "Donald Duck", "Daisy Duck", "Goofy", "Pluto", "Chip", "Dale", "Pete", "Oswald the Lucky Rabbit"] },
+  { key: "aladdin", name: "阿拉丁", aliases: ["Abu", "Aladdin", "Genie", "Iago", "Jafar", "Jasmine", "Rajah"] },
+  { key: "alice", name: "爱丽丝梦游仙境", aliases: ["Alice", "Cheshire Cat", "Mad Hatter", "March Hare", "Oyster", "Queen of Hearts", "White Rabbit"] },
+  { key: "bambi", name: "小鹿斑比", aliases: ["Bambi", "Faline", "Flower", "Friend Owl", "Tumper"] },
+  { key: "beauty", name: "美女与野兽", aliases: ["Beast", "Belle", "Chip Potts", "Cogsworth", "Gaston", "Lumiere", "Mrs Potts"] },
+  { key: "brave", name: "勇敢传说", aliases: ["Angus", "King Fergus", "Maudie", "Merida", "Mordu", "Queen Elinor", "The Witch"] },
+  { key: "cars", name: "赛车总动员", aliases: ["Cruz Ramirez", "Doc Hudson", "Jackson Storm", "Lightning McQueen", "Smokey", "Tow Mater"] },
+  { key: "cinderella", name: "灰姑娘", aliases: ["Cinderella", "Fairy Godmother", "Gus", "Jaq", "Lady Tremaine", "Prince Charming", "Tremaine Cat"] },
+  { key: "coco", name: "寻梦环游记", aliases: ["Coco", "Dante", "Dela Cruz", "Hector Rivera", "Imelda Rivera", "Miguel Rivera", "Pepita"] },
+  { key: "dumbo", name: "小飞象", aliases: ["Dumbo"] },
+  { key: "elemental", name: "疯狂元素城", aliases: ["Bernie", "Clod", "Ember", "Wade"] },
+  { key: "encanto", name: "魔法满屋", aliases: ["Alma Madrigal", "Antonio Madrigal", "Bruno Madrigal", "Isabela Madrigal", "Luisa Madrigal", "Mirabel Madrigal"] },
+  { key: "finding", name: "海底总动员", aliases: ["Bailey", "Darla", "Destiny", "Dory", "Hank", "Marlin", "Nemo", "Nigel", "Sea Turtle"] },
+  { key: "frozen", name: "冰雪奇缘", aliases: ["Anna", "Earth Giant", "Elsa", "Fire Spirit", "Gale", "Kristoff", "Marshmellow", "Mattias", "Nokk", "Olaf", "Snowgies", "Sven", "Yelena"] },
+  { key: "incredibles", name: "超人总动员", aliases: ["Dash Parr", "Edna Mode", "Elastigirl", "Jack-Jack Parr", "Mr. Incredible", "Mr. Incredible", "Syndrome", "Violet Parr"] },
+  { key: "inside-out", name: "头脑特工队", aliases: ["Anger", "Bing Bong", "Disgust", "Fear", "Joy", "Sadness"] },
+  { key: "jungle-book", name: "森林王子", aliases: ["Bagheera", "Baloo", "Kaa", "King Louie", "Mowgli", "Shere Khan"] },
+  { key: "lilo-stitch", name: "星际宝贝", aliases: ["Angel", "Captain Gantu", "Jumba", "Lilo Pelekai", "Scrump", "Stitch"] },
+  { key: "lion-king", name: "狮子王", aliases: ["Banzai", "Ed", "Nala", "Pumba", "Rafiki", "Scar", "Shenzi", "Simba", "Timon", "Zazu"] },
+  { key: "little-mermaid", name: "小美人鱼", aliases: ["Ariel", "Flounder", "King Triton", "Prince Eric", "Scuttle", "Sebastian", "Ursula"] },
+  { key: "luca", name: "夏日友晴天", aliases: ["Alberto Scorfano", "Giulia Marcovaldo", "Luca Paguro"] },
+  { key: "moana", name: "海洋奇缘", aliases: ["Hei Hei", "Kakamora", "Maui", "Moana", "Pua", "Tamatoa"] },
+  { key: "monsters", name: "怪兽电力公司", aliases: ["Art", "Boo", "Celia Mae", "Hardscrabble", "Johnny", "Mike Wazowski", "Randall", "Randall Boggs", "Roz", "Sulley"] },
+  { key: "mulan", name: "花木兰", aliases: ["Chien Po", "Crikee", "Ling", "Lishang", "Mulan", "Mushu", "Shanyu", "Yao"] },
+  { key: "nightmare", name: "圣诞夜惊魂", aliases: ["Dr. Finkelstein", "Jack Skellington", "Lock", "Oogie Boogie", "Sally", "Zero"] },
+  { key: "peter-pan", name: "小飞侠", aliases: ["Captain Hook", "John Darling", "Michael Darling", "Peter Pan", "Tinker Bell", "Wendy"] },
+  { key: "pinocchio", name: "木偶奇遇记", aliases: ["Cleo", "Figaro", "Geppetto", "Jiminy Cricket", "Monstro", "Pinocchio", "The Blue Fairy"] },
+  { key: "pirates", name: "加勒比海盗", aliases: ["Blackbeard", "Davy Jones", "Elizabeth Swann", "Hector Barbossa", "Jack Sparrow", "Joshamee Gibbs", "Will Turner"] },
+  { key: "pooh", name: "小熊维尼", aliases: ["eeyore", "heffalumps", "Piglet", "Rabbit", "Roo", "Tiger", "Tigger", "Winnie the Pooh"] },
+  { key: "princess-frog", name: "公主与青蛙", aliases: ["Charlotte", "Doctor Facilier", "Louis", "Mama Odie", "Prince Naveen", "Ray", "Tiana"] },
+  { key: "raya", name: "寻龙传说", aliases: ["Captain Boun", "Littlenoi", "Namaari", "Raya", "Sisudatu", "Tong"] },
+  { key: "sleeping-beauty", name: "睡美人", aliases: ["Aurora", "Fauna", "Flora", "Maleficent", "Merryweather", "Philip"] },
+  { key: "snow-white", name: "白雪公主", aliases: ["Bashful", "Doc", "Dopey", "Grumpy", "Happy", "Sleepy", "Sneezy", "Snow White"] },
+  { key: "soul", name: "心灵奇旅", aliases: ["22", "Boss", "Brook", "Dorothea", "Joe Gardner", "Libba", "Lutz", "Moonwind", "Paul (Soul)"] },
+  { key: "tangled", name: "魔发奇缘", aliases: ["Flynn Rider", "Maximus", "Mother Gothel", "Pascal", "Rapunzel"] },
+  { key: "toy-story", name: "玩具总动员", aliases: ["Alien", "Bo Peep", "Bunny", "Buzz Lightyear", "Ducky", "Forky", "Hamm", "Jessie", "Lots-o-Huggin Bear", "Rex", "Slinky Dog", "Woody", "Zurg"] },
+  { key: "up", name: "飞屋环游记", aliases: ["Carl", "Carl Fredricksen", "Charles F. Muntz", "Dug", "Ellie Fredricksen", "Kevin", "Russell"] },
+  { key: "wall-e", name: "机器人总动员", aliases: ["AUTO", "BURN-E", "Burnside", "Captain BMc Crea", "EVE", "M-O", "WALL-E"] },
+  { key: "wreck-it-ralph", name: "无敌破坏王", aliases: ["Calhoun", "Felix", "Mr Knows More", "Shank", "Vanellope von Schweetz", "Wreck-It Ralph", "Yesss"] },
+  { key: "zootopia", name: "疯狂动物城", aliases: ["Clawhauser", "Dawn Bellwether", "Finnick", "Flash", "Fru Fru", "Gazelle", "Judy Hopps", "Mr Big", "Nick Wilde"] },
+];
+
+const TOY_HOUSE_FALLBACK_ROOM = { key: "disney-friends", name: "迪士尼伙伴", aliases: [] };
+const TOY_HOUSE_ROOM_ALIAS_MAP = new Map();
+for (const room of TOY_HOUSE_ROOM_DEFINITIONS) {
+  for (const alias of room.aliases) {
+    TOY_HOUSE_ROOM_ALIAS_MAP.set(normalizeTextKey(alias), room);
+  }
+}
 
 const VILLAIN_ROSTER = [
   { name: "查尔斯·蒙兹", assetId: 19 },
@@ -470,8 +654,17 @@ let sceneTextureLoadPromises = new Map();
 let textureWarmupCursor = 0;
 let toyHouseContainer = null;
 let toyHouseEngine = null;
+let toyHouseRoomLayer = null;
 let toyHouseTsums = [];
 let toyHouseEffects = [];
+let toyHouseRooms = [];
+let toyHouseRoomIndex = 0;
+let toyHouseRoomRenderToken = 0;
+let toyHouseRoomTitleText = null;
+let toyHouseStatusText = null;
+let toyHousePrevButton = null;
+let toyHouseNextButton = null;
+let toyHouseDrag = null;
 let toyHouseActive = false;
 let toyHouseLoading = false;
 let heroContainer = null;
@@ -516,6 +709,52 @@ function clamp(value, min, max) {
     return (min + max) / 2;
   }
   return Math.max(min, Math.min(max, value));
+}
+
+function normalizeTextKey(value) {
+  return String(value || "")
+    .replace(/[._-]+/g, " ")
+    .replace(/[^\p{L}\p{N}\s]+/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function stripToyHouseNameModifiers(value) {
+  let result = String(value || "").replace(/\s+/g, " ").trim();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const modifier of TOY_HOUSE_MODIFIER_PREFIXES) {
+      const escaped = modifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const prefix = new RegExp(`^${escaped}\\s+`, "i");
+      if (prefix.test(result)) {
+        result = result.replace(prefix, "").trim();
+        changed = true;
+      }
+    }
+  }
+  result = result
+    .replace(/^SP(Autumn|Christmas|Holiday|Holidy|Summer|Spring)\s+/i, "")
+    .replace(/^day\s+/i, "")
+    .replace(/^Skill\s+/i, "")
+    .replace(/\s+Skill$/i, "")
+    .replace(/\s+hula$/i, "")
+    .replace(/\s+\d+$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return result;
+}
+
+function getToyHouseBaseName(item) {
+  const name = stripToyHouseNameModifiers(item?.lookupName || item?.name || "");
+  const alias = TOY_HOUSE_BASE_NAME_ALIASES[normalizeTextKey(name)];
+  return alias || name || "Disney Tsum Tsum";
+}
+
+function getToyHouseRoomDefinition(item) {
+  const baseName = getToyHouseBaseName(item);
+  return TOY_HOUSE_ROOM_ALIAS_MAP.get(normalizeTextKey(baseName)) || TOY_HOUSE_FALLBACK_ROOM;
 }
 
 function seededRandom(seed) {
@@ -2372,11 +2611,75 @@ function fitSpriteCover(sprite, width, height) {
   sprite.position.set(width / 2, height / 2);
 }
 
-function getUnlockedFriendlySpriteIds() {
+function getUnlockedToyHouseSpriteIds() {
   return [...unlockedSprites]
     .map(normalizeSpriteId)
-    .filter((id) => id && FRIENDLY_SPRITE_ID_SET.has(id))
+    .filter(Boolean)
     .sort((a, b) => a - b);
+}
+
+function getToyHouseBucketAssetPath(item) {
+  const baseName = getToyHouseBaseName(item);
+  return TOY_HOUSE_BUCKET_ASSETS_BY_BASE[normalizeTextKey(baseName)] || null;
+}
+
+function getToyHouseCatalogItem(id, catalogMap) {
+  return catalogMap?.get(id) || {
+    id,
+    name: `松松 ${id}`,
+    lookupName: `松松 ${id}`,
+  };
+}
+
+function buildToyHouseRooms(unlockedIds, catalogMap) {
+  const roomsByKey = new Map();
+  const roomOrder = new Map(TOY_HOUSE_ROOM_DEFINITIONS.map((room, index) => [room.key, index]));
+  roomOrder.set(TOY_HOUSE_FALLBACK_ROOM.key, TOY_HOUSE_ROOM_DEFINITIONS.length + 1);
+
+  for (const id of unlockedIds) {
+    const item = getToyHouseCatalogItem(id, catalogMap);
+    const roomDef = getToyHouseRoomDefinition(item);
+    if (!roomsByKey.has(roomDef.key)) {
+      roomsByKey.set(roomDef.key, {
+        key: roomDef.key,
+        name: roomDef.name,
+        ids: [],
+        order: roomOrder.get(roomDef.key) ?? roomOrder.get(TOY_HOUSE_FALLBACK_ROOM.key),
+      });
+    }
+    roomsByKey.get(roomDef.key).ids.push(id);
+  }
+
+  return [...roomsByKey.values()]
+    .map((room) => ({
+      ...room,
+      ids: room.ids.sort((a, b) => {
+        const aName = getToyHouseCatalogItem(a, catalogMap).name || "";
+        const bName = getToyHouseCatalogItem(b, catalogMap).name || "";
+        return aName.localeCompare(bName, "zh-CN") || a - b;
+      }),
+    }))
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "zh-CN"));
+}
+
+async function loadToyHouseTsumTexture(id, catalogMap) {
+  const item = getToyHouseCatalogItem(id, catalogMap);
+  const bucketPath = getToyHouseBucketAssetPath(item);
+  if (bucketPath) {
+    const texture = await loadPixiTexture(bucketPath);
+    return { id, texture, isBucket: true };
+  }
+
+  const texture = await loadSpriteTexture(id);
+  return { id, texture, isBucket: false };
+}
+
+function fitToyHouseSprite(sprite, maxWidth, maxHeight) {
+  const textureWidth = sprite.texture.width || maxWidth;
+  const textureHeight = sprite.texture.height || maxHeight;
+  const scale = Math.min(maxWidth / textureWidth, maxHeight / textureHeight);
+  sprite.scale.set(scale);
+  sprite._baseToyScale = { x: scale, y: scale };
 }
 
 function drawHeartShape(graphics, x, y, size, color, alpha = 1) {
@@ -2399,7 +2702,7 @@ function addToyHouseStaticRect(x, y, width, height, options = {}) {
     isStatic: true,
     restitution: options.restitution ?? 0.22,
     friction: options.friction ?? 0.18,
-    frictionStatic: 0.04,
+    frictionStatic: options.frictionStatic ?? 0.04,
   };
   if (options.collisionFilter) {
     bodyOptions.collisionFilter = options.collisionFilter;
@@ -2410,7 +2713,7 @@ function addToyHouseStaticRect(x, y, width, height, options = {}) {
   return body;
 }
 
-function drawToyHouseFurniture(container) {
+function drawToyHouseFurniture(container, cakeTexture) {
   const furniture = new PIXI.Graphics();
 
   furniture.beginFill(0x7f5a44, 0.82);
@@ -2422,69 +2725,93 @@ function drawToyHouseFurniture(container) {
   }
   furniture.endFill();
 
-  furniture.beginFill(0xffb0b8, 0.96);
-  furniture.drawRoundedRect(34, 682, 142, 58, 14);
-  furniture.endFill();
-  furniture.beginFill(0xffd2d8, 0.96);
-  furniture.drawRoundedRect(48, 648, 112, 54, 16);
-  furniture.endFill();
-  furniture.beginFill(0x9fd6ff, 0.92);
-  furniture.drawRoundedRect(64, 628, 58, 42, 12);
-  furniture.endFill();
-
-  furniture.beginFill(0xffd66e, 0.94);
-  furniture.drawRoundedRect(270, 724, 68, 56, 9);
-  furniture.endFill();
-  furniture.beginFill(0x73f7cf, 0.94);
-  furniture.drawRoundedRect(320, 690, 52, 90, 9);
-  furniture.endFill();
-  furniture.beginFill(0xffffff, 0.28);
-  furniture.drawRoundedRect(282, 736, 18, 18, 5);
-  furniture.drawRoundedRect(332, 704, 16, 16, 5);
-  furniture.endFill();
-
-  furniture.beginFill(0xf8f0dc, 0.96);
-  furniture.drawRoundedRect(238, 540, 124, 24, 12);
-  furniture.endFill();
-  furniture.beginFill(0x82c9ff, 0.82);
-  furniture.drawRoundedRect(256, 502, 88, 42, 12);
-  furniture.endFill();
-
   furniture.beginFill(0xffffff, 0.16);
-  furniture.drawEllipse(DESIGN_WIDTH / 2, 820, 176, 34);
+  furniture.drawEllipse(DESIGN_WIDTH / 2, TOY_HOUSE_FLOOR_Y + 3, 188, 34);
   furniture.endFill();
 
   furniture.zIndex = 2;
   container.addChild(furniture);
 
-  TOY_HOUSE_LANE_FLOOR_YS.forEach((floorY, index) => {
-    addToyHouseStaticRect(0, floorY, DESIGN_WIDTH, 18, {
-      restitution: 0.18,
-      friction: 0.28,
-      collisionFilter: {
-        category: TOY_HOUSE_LANE_FLOOR_CATEGORIES[index],
-        mask: TOY_HOUSE_TOY_CATEGORY,
-      },
-    });
+  if (cakeTexture) {
+    const cake = new PIXI.Sprite(cakeTexture);
+    cake.anchor.set(0.5);
+    const cakeScale = TOY_HOUSE_CAKE_WIDTH / (cake.texture.width || TOY_HOUSE_CAKE_WIDTH);
+    cake.scale.set(cakeScale);
+    cake.position.set(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y);
+    cake.zIndex = 5;
+    container.addChild(cake);
+    addToyHouseStaticRect(
+      TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2,
+      TOY_HOUSE_CAKE_SURFACE_Y,
+      TOY_HOUSE_CAKE_SURFACE_WIDTH,
+      18,
+      { restitution: 0.18, friction: 0.72 },
+    );
+    addToyHouseStaticRect(
+      TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.36,
+      TOY_HOUSE_CAKE_SURFACE_Y + 30,
+      TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.72,
+      18,
+      { restitution: 0.12, friction: 0.78 },
+    );
+  } else {
+    const cake = new PIXI.Graphics();
+    cake.beginFill(0xffa63a, 0.92);
+    cake.drawEllipse(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y, TOY_HOUSE_CAKE_WIDTH / 2, 44);
+    cake.endFill();
+    cake.beginFill(0xffc45a, 0.94);
+    cake.drawEllipse(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y - 16, TOY_HOUSE_CAKE_WIDTH * 0.42, 32);
+    cake.endFill();
+    cake.zIndex = 5;
+    container.addChild(cake);
+    addToyHouseStaticRect(
+      TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2,
+      TOY_HOUSE_CAKE_SURFACE_Y,
+      TOY_HOUSE_CAKE_SURFACE_WIDTH,
+      18,
+      { restitution: 0.18, friction: 0.72 },
+    );
+  }
+
+  addToyHouseStaticRect(0, TOY_HOUSE_FLOOR_Y, DESIGN_WIDTH, 86, {
+    restitution: 0.16,
+    friction: 0.82,
+    frictionStatic: 0.68,
   });
-  addToyHouseStaticRect(0, TOY_HOUSE_FLOOR_Y, DESIGN_WIDTH, 44, { restitution: 0.18, friction: 0.28 });
-  addToyHouseStaticRect(-26, 110, 34, 820, { restitution: 0.18 });
-  addToyHouseStaticRect(DESIGN_WIDTH - 8, 110, 34, 820, { restitution: 0.18 });
+  addToyHouseStaticRect(0, TOY_HOUSE_PLAY_TOP_Y - 18, DESIGN_WIDTH, 18, {
+    restitution: 0.08,
+    friction: 0.5,
+  });
+  addToyHouseStaticRect(-78, 110, 92, 864, { restitution: 0.12, friction: 0.72 });
+  addToyHouseStaticRect(DESIGN_WIDTH - 14, 110, 92, 864, { restitution: 0.12, friction: 0.72 });
 }
 
-function makeToyHouseTsumView(texture) {
+function makeToyHouseTsumView(texture, isBucket) {
   const view = new PIXI.Container();
   const shadow = new PIXI.Graphics();
   shadow.beginFill(0x382816, 0.22);
-  shadow.drawEllipse(0, 22, 25, 8);
+  shadow.drawEllipse(0, 20, 22, 7);
   shadow.endFill();
   view.addChild(shadow);
 
+  if (!isBucket) {
+    const body = new PIXI.Graphics();
+    body.beginFill(0xf7c65a, 0.78);
+    body.drawRoundedRect(-20, -2, 40, 32, 14);
+    body.endFill();
+    body.lineStyle(2, 0xffffff, 0.22);
+    body.drawRoundedRect(-20, -2, 40, 32, 14);
+    view.addChild(body);
+  }
+
   const sprite = new PIXI.Sprite(texture);
   sprite.anchor.set(0.5);
-  sprite.width = 60;
-  sprite.height = 60;
-  sprite.position.set(0, -4);
+  fitToyHouseSprite(
+    sprite,
+    isBucket ? TOY_HOUSE_SPRITE_MAX_WIDTH : TOY_HOUSE_FALLBACK_SPRITE_SIZE,
+    isBucket ? TOY_HOUSE_SPRITE_MAX_HEIGHT : TOY_HOUSE_FALLBACK_SPRITE_SIZE,
+  );
+  sprite.position.set(0, isBucket ? -8 : -12);
   view.addChild(sprite);
   view._toySprite = sprite;
   return view;
@@ -2517,17 +2844,77 @@ function createToyHouseHeartBubble(x, y) {
   });
 }
 
-function touchToyHouseTsum(toy, event) {
+function startToyHouseDrag(toy, event) {
   event?.stopPropagation?.();
   activateMobileSession();
   playToyHouseTouchSound();
-  Body.setVelocity(toy.body, {
-    x: toy.body.velocity.x + (Math.random() - 0.5) * 3.4,
-    y: -7.2 - Math.random() * 2.2,
+  const point = getPointerPosition(event);
+  toyHouseDrag = {
+    toy,
+    pointerId: event?.pointerId ?? 0,
+    offsetX: toy.body.position.x - point.x,
+    offsetY: toy.body.position.y - point.y,
+    lastX: point.x,
+    lastY: point.y,
+    lastAt: performance.now(),
+    moved: 0,
+  };
+  toy.isDragged = true;
+  toy.view.zIndex = 40;
+  Body.setVelocity(toy.body, { x: 0, y: 0 });
+  Body.setAngularVelocity(toy.body, 0);
+  Body.setStatic(toy.body, true);
+  Body.setPosition(toy.body, {
+    x: clamp(point.x + toyHouseDrag.offsetX, 28, DESIGN_WIDTH - 28),
+    y: clamp(point.y + toyHouseDrag.offsetY - 30, TOY_HOUSE_PLAY_TOP_Y, TOY_HOUSE_FLOOR_Y - 28),
   });
-  Body.setAngularVelocity(toy.body, toy.body.angularVelocity + (Math.random() - 0.5) * 0.22);
   createToyHouseHeartBubble(toy.body.position.x, toy.body.position.y);
   triggerHaptic(28);
+}
+
+function dragToyHouseTsum(event) {
+  if (!toyHouseDrag || !toyHouseDrag.toy) {
+    return;
+  }
+  if (event?.pointerId !== undefined && toyHouseDrag.pointerId !== event.pointerId) {
+    return;
+  }
+
+  event?.stopPropagation?.();
+  const point = getPointerPosition(event);
+  const now = performance.now();
+  const nextX = clamp(point.x + toyHouseDrag.offsetX, 24, DESIGN_WIDTH - 24);
+  const nextY = clamp(point.y + toyHouseDrag.offsetY - 30, TOY_HOUSE_PLAY_TOP_Y, TOY_HOUSE_FLOOR_Y - 30);
+  toyHouseDrag.moved += Math.hypot(point.x - toyHouseDrag.lastX, point.y - toyHouseDrag.lastY);
+  toyHouseDrag.lastX = point.x;
+  toyHouseDrag.lastY = point.y;
+  toyHouseDrag.lastAt = now;
+  Body.setPosition(toyHouseDrag.toy.body, { x: nextX, y: nextY });
+  Body.setVelocity(toyHouseDrag.toy.body, { x: 0, y: 0 });
+}
+
+function releaseToyHouseDrag(event) {
+  if (!toyHouseDrag || !toyHouseDrag.toy) {
+    return;
+  }
+  if (event?.pointerId !== undefined && toyHouseDrag.pointerId !== event.pointerId) {
+    return;
+  }
+
+  event?.stopPropagation?.();
+  const point = event ? getPointerPosition(event) : { x: toyHouseDrag.lastX, y: toyHouseDrag.lastY };
+  const toy = toyHouseDrag.toy;
+  const flingX = clamp((point.x - toyHouseDrag.lastX) * 0.18, -3.2, 3.2);
+  const gentleLift = toyHouseDrag.moved < 8 ? -4.8 : -1.4;
+  toyHouseDrag = null;
+  toy.isDragged = false;
+  toy.manualUntil = performance.now() + 3200;
+  Body.setStatic(toy.body, false);
+  Body.setVelocity(toy.body, {
+    x: toy.body.velocity.x + flingX,
+    y: Math.min(toy.body.velocity.y, gentleLift),
+  });
+  Body.setAngularVelocity(toy.body, clamp(toy.body.angularVelocity + flingX * 0.04, -0.16, 0.16));
 }
 
 function updateToyHouseEffects() {
@@ -2546,6 +2933,21 @@ function updateToyHouseEffects() {
   }
 }
 
+function resetEscapedToyHouseTsum(toy, now) {
+  const x = clamp(toy.homeX + (Math.random() - 0.5) * 36, 42, DESIGN_WIDTH - 42);
+  const y = TOY_HOUSE_PLAY_TOP_Y + 70 + Math.random() * 120;
+  Body.setStatic(toy.body, false);
+  Body.setPosition(toy.body, { x, y });
+  Body.setVelocity(toy.body, {
+    x: (Math.random() - 0.5) * 0.8,
+    y: 0.2 + Math.random() * 0.7,
+  });
+  Body.setAngularVelocity(toy.body, (Math.random() - 0.5) * 0.05);
+  toy.manualUntil = now + 900 + Math.random() * 900;
+  toy.nextTurnAt = now + 1200 + Math.random() * 1800;
+  toy.nextJumpAt = now + 1800 + Math.random() * 2600;
+}
+
 function updateToyHouse(now, delta) {
   if (!toyHouseActive || !toyHouseEngine) {
     return;
@@ -2560,6 +2962,47 @@ function updateToyHouse(now, delta) {
     steps += 1;
   }
   for (const toy of toyHouseTsums) {
+    if (
+      toy.body.position.x < -90
+      || toy.body.position.x > DESIGN_WIDTH + 90
+      || toy.body.position.y > DESIGN_HEIGHT + 160
+      || toy.body.position.y < 70
+    ) {
+      resetEscapedToyHouseTsum(toy, now);
+    }
+
+    if (toy.isDragged) {
+      toy.view.position.set(toy.body.position.x, toy.body.position.y);
+      toy.view.rotation = toy.body.angle * 0.18;
+      continue;
+    }
+
+    const manualResting = now < (toy.manualUntil || 0);
+    const onCake = (
+      Math.abs(toy.body.position.y - (TOY_HOUSE_CAKE_SURFACE_Y - TOY_HOUSE_BODY_HEIGHT / 2)) < 22
+      && Math.abs(toy.body.position.x - TOY_HOUSE_CAKE_X) < TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.54
+    );
+    const onFloor = toy.body.position.y >= TOY_HOUSE_FLOOR_Y - TOY_HOUSE_BODY_HEIGHT - 9;
+    const grounded = (onFloor || onCake) && Math.abs(toy.body.velocity.y) < 1.45;
+
+    if (!manualResting && grounded && onFloor && now > toy.nextCakeJumpAt) {
+      const towardCake = clamp((TOY_HOUSE_CAKE_X - toy.body.position.x) * 0.035, -3.4, 3.4);
+      Body.setVelocity(toy.body, {
+        x: towardCake + (Math.random() - 0.5) * 0.7,
+        y: -8.2 - Math.random() * 1.8,
+      });
+      Body.setAngularVelocity(toy.body, toy.body.angularVelocity + Math.sign(towardCake || toy.direction) * 0.05);
+      toy.nextCakeJumpAt = now + 6800 + Math.random() * 7600;
+      toy.nextJumpAt = now + 1400 + Math.random() * 1800;
+    }
+
+    if (manualResting) {
+      toy.view.position.set(toy.body.position.x, toy.body.position.y);
+      toy.view.rotation = toy.body.angle * 0.22;
+      toy.view.zIndex = 12 + toy.body.position.y / 1000;
+      continue;
+    }
+
     if (now > toy.nextTurnAt || Math.abs(toy.targetX - toy.body.position.x) < 18) {
       toy.targetX = clamp(
         toy.homeX + (Math.random() - 0.5) * toy.roamRadius * 2,
@@ -2577,7 +3020,6 @@ function updateToyHouse(now, delta) {
       y: toy.body.velocity.y,
     });
 
-    const grounded = toy.body.position.y >= toy.restY - 7 && Math.abs(toy.body.velocity.y) < 1.45;
     if (grounded && now > toy.nextJumpAt) {
       Body.setVelocity(toy.body, {
         x: toy.body.velocity.x + toy.direction * (0.65 + Math.random() * 0.75),
@@ -2593,21 +3035,74 @@ function updateToyHouse(now, delta) {
     toy.view.scale.x = Math.abs(toy.view.scale.x) * (toy.direction < 0 ? -1 : 1);
     if (toy.view._toySprite) {
       const squash = grounded ? 1 : 1 + Math.min(0.1, Math.abs(toy.body.velocity.y) * 0.008);
-      toy.view._toySprite.scale.y = squash;
-      toy.view._toySprite.scale.x = 1 / squash;
+      const base = toy.view._toySprite._baseToyScale || { x: 1, y: 1 };
+      toy.view._toySprite.scale.y = base.y * squash;
+      toy.view._toySprite.scale.x = base.x / squash;
     }
   }
   updateToyHouseEffects();
 }
 
+function clearToyHouseRoom() {
+  if (toyHouseDrag) {
+    releaseToyHouseDrag();
+  }
+  if (toyHouseEngine) {
+    for (const toy of toyHouseTsums) {
+      Composite.remove(toyHouseEngine.world, toy.body);
+    }
+  }
+  for (const effect of toyHouseEffects) {
+    effect.view.destroy({ children: true });
+  }
+  toyHouseEffects = [];
+  toyHouseTsums = [];
+  if (toyHouseRoomLayer) {
+    toyHouseRoomLayer.removeChildren().forEach((child) => child.destroy({ children: true }));
+  }
+}
+
+function updateToyHouseRoomUi() {
+  const room = toyHouseRooms[toyHouseRoomIndex];
+  if (toyHouseRoomTitleText) {
+    toyHouseRoomTitleText.text = room ? room.name : "松松玩具屋";
+  }
+  if (toyHouseStatusText) {
+    const total = toyHouseRooms.reduce((sum, item) => sum + item.ids.length, 0);
+    toyHouseStatusText.text = room
+      ? `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · ${room.ids.length}/${total}`
+      : "还没有已解锁的松松";
+  }
+  if (toyHousePrevButton) {
+    setButtonStyle(toyHousePrevButton, {
+      fill: toyHouseRoomIndex > 0 ? 0x0e5e78 : 0x54616b,
+      alpha: toyHouseRoomIndex > 0 ? 0.9 : 0.58,
+    });
+  }
+  if (toyHouseNextButton) {
+    setButtonStyle(toyHouseNextButton, {
+      fill: toyHouseRoomIndex < toyHouseRooms.length - 1 ? 0x0e5e78 : 0x54616b,
+      alpha: toyHouseRoomIndex < toyHouseRooms.length - 1 ? 0.9 : 0.58,
+    });
+  }
+}
+
 function destroyToyHouse() {
+  clearToyHouseRoom();
   if (toyHouseContainer) {
     toyHouseContainer.destroy({ children: true });
     toyHouseContainer = null;
   }
   toyHouseEngine = null;
-  toyHouseTsums = [];
-  toyHouseEffects = [];
+  toyHouseRoomLayer = null;
+  toyHouseRooms = [];
+  toyHouseRoomIndex = 0;
+  toyHouseRoomRenderToken += 1;
+  toyHouseRoomTitleText = null;
+  toyHouseStatusText = null;
+  toyHousePrevButton = null;
+  toyHouseNextButton = null;
+  toyHouseDrag = null;
   toyHouseActive = false;
 }
 
@@ -2616,56 +3111,68 @@ function closeToyHouse() {
   showLevelSelect();
 }
 
-async function populateToyHouse(container, statusText) {
-  const unlockedFriendlyIds = getUnlockedFriendlySpriteIds();
-  const visibleIds = shuffle(unlockedFriendlyIds).slice(0, TOY_HOUSE_MAX_TSUMS);
-  if (statusText) {
-    statusText.text = unlockedFriendlyIds.length
-      ? `轮换 ${visibleIds.length}/${unlockedFriendlyIds.length}`
-      : "还没有已解锁的友善松松";
-  }
-  if (visibleIds.length === 0) {
+async function populateToyHouseRoom(roomIndex) {
+  if (!toyHouseContainer || !toyHouseRoomLayer || !toyHouseEngine || !toyHouseRooms.length) {
     return;
   }
 
-  const texturesById = new Map();
-  const loadedTextures = await loadSpriteTextures(visibleIds);
-  visibleIds.forEach((id, index) => {
-    texturesById.set(id, loadedTextures[index]);
-  });
+  const room = toyHouseRooms[clamp(roomIndex, 0, toyHouseRooms.length - 1)];
+  if (!room) {
+    return;
+  }
 
-  visibleIds.forEach((id, index) => {
-    const laneCount = TOY_HOUSE_LANE_FLOOR_YS.length;
-    const laneIndex = index % laneCount;
-    const col = Math.floor(index / laneCount);
-    const columns = Math.ceil(visibleIds.length / laneCount);
-    const colStep = columns > 1 ? (DESIGN_WIDTH - 104) / (columns - 1) : 0;
-    const laneFloorY = TOY_HOUSE_LANE_FLOOR_YS[laneIndex];
-    const laneFloorCategory = TOY_HOUSE_LANE_FLOOR_CATEGORIES[laneIndex];
-    const homeX = 52 + col * colStep + (laneIndex - 1) * 12;
-    const x = homeX + (Math.random() - 0.5) * 14;
-    const y = laneFloorY - 44 - Math.random() * 16;
-    const body = Bodies.circle(clamp(x, 44, DESIGN_WIDTH - 44), clamp(y, 640, laneFloorY - 2), TOY_HOUSE_BODY_RADIUS, {
-      restitution: 0.22,
-      friction: 0.018,
-      frictionStatic: 0,
-      frictionAir: 0.018,
-      density: 0.0013,
-      slop: 0.1,
-      collisionFilter: {
-        category: TOY_HOUSE_TOY_CATEGORY,
-        mask: TOY_HOUSE_WALL_CATEGORY | laneFloorCategory,
-        group: -1,
+  toyHouseRoomIndex = toyHouseRooms.indexOf(room);
+  toyHouseRoomRenderToken += 1;
+  const token = toyHouseRoomRenderToken;
+  clearToyHouseRoom();
+  updateToyHouseRoomUi();
+
+  const catalogMap = await loadCollectionCatalog();
+  const loaded = await Promise.all(room.ids.map((id) => loadToyHouseTsumTexture(id, catalogMap)));
+  if (token !== toyHouseRoomRenderToken || !toyHouseRoomLayer || !toyHouseEngine) {
+    return;
+  }
+
+  const count = loaded.length;
+  const columns = clamp(Math.ceil(Math.sqrt(Math.max(1, count) * 1.45)), 5, 9);
+  const colStep = columns > 1 ? (DESIGN_WIDTH - 92) / (columns - 1) : 0;
+  const rowStep = 43;
+  const startY = count > 26 ? 356 : 430;
+  const now = performance.now();
+
+  loaded.forEach((entry, index) => {
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    const homeX = 46 + col * colStep;
+    const x = homeX + (Math.random() - 0.5) * 12;
+    const y = startY + row * rowStep + (Math.random() - 0.5) * 10;
+    const body = Bodies.rectangle(
+      clamp(x, 28, DESIGN_WIDTH - 28),
+      clamp(y, 170, TOY_HOUSE_FLOOR_Y - 70),
+      TOY_HOUSE_BODY_WIDTH,
+      TOY_HOUSE_BODY_HEIGHT,
+      {
+        restitution: 0.14,
+        friction: 0.42,
+        frictionStatic: 0.64,
+        frictionAir: 0.024,
+        density: 0.00145,
+        slop: 0.06,
+        chamfer: { radius: 12 },
+        collisionFilter: {
+          category: TOY_HOUSE_TOY_CATEGORY,
+          mask: TOY_HOUSE_WALL_CATEGORY | TOY_HOUSE_TOY_CATEGORY,
+        },
       },
-    });
+    );
     Body.setVelocity(body, {
-      x: (Math.random() - 0.5) * 1.8,
-      y: 0.4 + Math.random() * 1.1,
+      x: (Math.random() - 0.5) * 1.2,
+      y: 0.25 + Math.random() * 0.8,
     });
-    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.08);
+    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.05);
     Composite.add(toyHouseEngine.world, body);
 
-    const view = makeToyHouseTsumView(texturesById.get(id));
+    const view = makeToyHouseTsumView(entry.texture, entry.isBucket);
     view.position.set(body.position.x, body.position.y);
     view.zIndex = 12;
     view.eventMode = "static";
@@ -2673,23 +3180,25 @@ async function populateToyHouse(container, statusText) {
     const toy = {
       body,
       view,
-      spriteId: id,
+      spriteId: entry.id,
       direction: Math.random() < 0.5 ? -1 : 1,
-      homeX: clamp(homeX, 44, DESIGN_WIDTH - 44),
-      targetX: clamp(x + (Math.random() - 0.5) * 48, 44, DESIGN_WIDTH - 44),
-      roamRadius: 30 + Math.random() * 24,
-      walkSpeed: 0.72 + Math.random() * 0.56,
-      restY: laneFloorY + TOY_HOUSE_BODY_RADIUS,
-      nextTurnAt: performance.now() + 700 + Math.random() * 1700,
-      nextJumpAt: performance.now() + 900 + Math.random() * 2400,
+      homeX: clamp(homeX, 34, DESIGN_WIDTH - 34),
+      targetX: clamp(x + (Math.random() - 0.5) * 48, 34, DESIGN_WIDTH - 34),
+      roamRadius: 24 + Math.random() * 22,
+      walkSpeed: 0.36 + Math.random() * 0.38,
+      nextTurnAt: now + 900 + Math.random() * 2100,
+      nextJumpAt: now + 1100 + Math.random() * 2800,
+      nextCakeJumpAt: now + 1600 + Math.random() * 5200,
+      manualUntil: now + 1300 + Math.random() * 1200,
+      isDragged: false,
     };
-    view.on("pointertap", (event) => touchToyHouseTsum(toy, event));
-    container.addChild(view);
+    view.on("pointerdown", (event) => startToyHouseDrag(toy, event));
+    toyHouseRoomLayer.addChild(view);
     toyHouseTsums.push(toy);
   });
 
-  const nextWarmIds = unlockedFriendlyIds.filter((id) => !visibleIds.includes(id)).slice(0, 36);
-  warmSpriteTextures(nextWarmIds, 6);
+  const warmIds = getUnlockedToyHouseSpriteIds().filter((id) => !room.ids.includes(id)).slice(0, 48);
+  warmSpriteTextures(warmIds, 6);
 }
 
 async function showToyHouse() {
@@ -2722,11 +3231,29 @@ async function showToyHouse() {
   toyHouseContainer.eventMode = "static";
   toyHouseContainer.hitArea = new PIXI.Rectangle(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
   toyHouseContainer.on("pointerdown", (event) => event.stopPropagation());
-  toyHouseContainer.on("pointermove", (event) => event.stopPropagation());
-  toyHouseContainer.on("pointerup", (event) => event.stopPropagation());
+  toyHouseContainer.on("pointermove", (event) => {
+    dragToyHouseTsum(event);
+    event.stopPropagation();
+  });
+  toyHouseContainer.on("pointerup", (event) => {
+    releaseToyHouseDrag(event);
+    event.stopPropagation();
+  });
+  toyHouseContainer.on("pointerupoutside", (event) => {
+    releaseToyHouseDrag(event);
+    event.stopPropagation();
+  });
+  toyHouseContainer.on("pointercancel", (event) => {
+    releaseToyHouseDrag(event);
+    event.stopPropagation();
+  });
 
   try {
-    const backgroundTexture = await loadPixiTexture(TOY_HOUSE_BACKGROUND_PATH);
+    const [backgroundTexture, cakeTexture, catalogMap] = await Promise.all([
+      loadPixiTexture(TOY_HOUSE_BACKGROUND_PATH),
+      loadPixiTexture(TOY_HOUSE_CAKE_PLATFORM_PATH).catch(() => null),
+      loadCollectionCatalog(),
+    ]);
     const bg = new PIXI.Sprite(backgroundTexture);
     fitSpriteCover(bg, DESIGN_WIDTH, DESIGN_HEIGHT);
     bg.zIndex = 0;
@@ -2739,7 +3266,12 @@ async function showToyHouse() {
     shade.zIndex = 1;
     toyHouseContainer.addChild(shade);
 
-    drawToyHouseFurniture(toyHouseContainer);
+    drawToyHouseFurniture(toyHouseContainer, cakeTexture);
+
+    toyHouseRoomLayer = new PIXI.Container();
+    toyHouseRoomLayer.zIndex = 12;
+    toyHouseRoomLayer.sortableChildren = true;
+    toyHouseContainer.addChild(toyHouseRoomLayer);
 
     const title = new PIXI.Text("松松玩具屋", {
       fill: 0xffffff,
@@ -2753,7 +3285,19 @@ async function showToyHouse() {
     title.zIndex = 20;
     toyHouseContainer.addChild(title);
 
-    const statusText = new PIXI.Text("准备中...", {
+    toyHouseRoomTitleText = new PIXI.Text("准备中...", {
+      fill: 0xffffff,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 17,
+      fontWeight: "900",
+      stroke: 0x0b4558,
+      strokeThickness: 4,
+    });
+    toyHouseRoomTitleText.position.set(34, 92);
+    toyHouseRoomTitleText.zIndex = 20;
+    toyHouseContainer.addChild(toyHouseRoomTitleText);
+
+    toyHouseStatusText = new PIXI.Text("准备中...", {
       fill: 0xfff7c8,
       fontFamily: "Arial, Microsoft YaHei, sans-serif",
       fontSize: 13,
@@ -2761,9 +3305,9 @@ async function showToyHouse() {
       stroke: 0x0b4558,
       strokeThickness: 3,
     });
-    statusText.position.set(34, 96);
-    statusText.zIndex = 20;
-    toyHouseContainer.addChild(statusText);
+    toyHouseStatusText.position.set(34, 118);
+    toyHouseStatusText.zIndex = 20;
+    toyHouseContainer.addChild(toyHouseStatusText);
 
     const close = createButton("返回", DESIGN_WIDTH - 102, 58, 70, 38, closeToyHouse, {
       fill: 0x0e5e78,
@@ -2775,9 +3319,42 @@ async function showToyHouse() {
     close.zIndex = 21;
     toyHouseContainer.addChild(close);
 
+    toyHousePrevButton = createButton("上一间", 28, 146, 76, 34, () => {
+      if (toyHouseRoomIndex > 0) {
+        populateToyHouseRoom(toyHouseRoomIndex - 1).catch(showFatalError);
+      }
+    }, {
+      fill: 0x0e5e78,
+      line: 0xfff7c8,
+      lineAlpha: 0.58,
+      textFill: 0xffffff,
+      fontSize: 13,
+    });
+    toyHousePrevButton.zIndex = 21;
+    toyHouseContainer.addChild(toyHousePrevButton);
+
+    toyHouseNextButton = createButton("下一间", DESIGN_WIDTH - 104, 146, 76, 34, () => {
+      if (toyHouseRoomIndex < toyHouseRooms.length - 1) {
+        populateToyHouseRoom(toyHouseRoomIndex + 1).catch(showFatalError);
+      }
+    }, {
+      fill: 0x0e5e78,
+      line: 0xfff7c8,
+      lineAlpha: 0.58,
+      textFill: 0xffffff,
+      fontSize: 13,
+    });
+    toyHouseNextButton.zIndex = 21;
+    toyHouseContainer.addChild(toyHouseNextButton);
+
+    toyHouseRooms = buildToyHouseRooms(getUnlockedToyHouseSpriteIds(), catalogMap);
+    toyHouseRoomIndex = 0;
+    updateToyHouseRoomUi();
     app.stage.addChild(toyHouseContainer);
-    await populateToyHouse(toyHouseContainer, statusText);
     toyHouseActive = true;
+    if (toyHouseRooms.length) {
+      await populateToyHouseRoom(0);
+    }
     warmGameplayTextureWindow();
   } catch (error) {
     destroyToyHouse();
@@ -5034,6 +5611,9 @@ window.__tsumDebug = {
     obstacleHp: levelObstacleViews.map((view) => view._hp ?? null),
     pendingRefillCount,
     toyHouseActive,
+    toyHouseRoomIndex,
+    toyHouseRoomCount: toyHouseRooms.length,
+    toyHouseRoomName: toyHouseRooms[toyHouseRoomIndex]?.name || null,
     toyHouseTsums: toyHouseTsums.length,
   }),
 };
