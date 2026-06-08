@@ -58,6 +58,7 @@ const SCENE_TEXTURE_SOFT_TIMEOUT_MS = 5200;
 const COLLECTION_GRID_BATCH_SIZE = 28;
 const COLLECTION_BATCH_DELAY_MS = 18;
 const TOY_HOUSE_ROOM_LOAD_BATCH_SIZE = 8;
+const HOME_HERO_SHORTCUT_COUNT = 3;
 
 const VILLAIN_SPRITE_IDS = [
   19, 22, 34, 37, 39, 42, 55, 63, 67, 72, 73, 74, 75, 80, 82, 90, 105, 121, 139, 141, 147, 183, 199, 203,
@@ -67,11 +68,11 @@ const VILLAIN_SPRITE_IDS = [
 const VILLAIN_SPRITE_ID_SET = new Set(VILLAIN_SPRITE_IDS);
 const FRIENDLY_SPRITE_IDS = allSpriteIds().filter((id) => !VILLAIN_SPRITE_ID_SET.has(id));
 const FRIENDLY_SPRITE_ID_SET = new Set(FRIENDLY_SPRITE_IDS);
-const TOY_HOUSE_FLOOR_Y = 894;
-const TOY_HOUSE_BODY_WIDTH = 38;
-const TOY_HOUSE_BODY_HEIGHT = 30;
-const TOY_HOUSE_SPRITE_MAX_WIDTH = 52;
-const TOY_HOUSE_SPRITE_MAX_HEIGHT = 50;
+const TOY_HOUSE_FLOOR_Y = 864;
+const TOY_HOUSE_BODY_WIDTH = 44;
+const TOY_HOUSE_BODY_HEIGHT = 42;
+const TOY_HOUSE_SPRITE_MAX_WIDTH = 56;
+const TOY_HOUSE_SPRITE_MAX_HEIGHT = 58;
 const TOY_HOUSE_FALLBACK_SPRITE_SIZE = 42;
 const TOY_HOUSE_CAKE_X = DESIGN_WIDTH / 2;
 const TOY_HOUSE_CAKE_Y = 744;
@@ -1278,6 +1279,22 @@ async function loadHeroTexture() {
 
   selectedHeroTexture = await loadSpriteTextureWithFallback(selectedHero.assetId);
   heroTextures.set(selectedHero.id, selectedHeroTexture);
+}
+
+async function loadHomeHeroShortcutTextures() {
+  await Promise.all(HEROES.slice(0, HOME_HERO_SHORTCUT_COUNT).map(async (hero) => {
+    if (heroTextures.has(hero.id)) {
+      return;
+    }
+    const texture = await loadSpriteTextureWithFallback(hero.assetId);
+    heroTextures.set(hero.id, texture);
+  }));
+}
+
+function getHeroTexture(hero) {
+  return heroTextures.get(hero.id)
+    || (hero.id === selectedHero.id ? selectedHeroTexture : null)
+    || getFallbackSpriteTexture(hero.assetId);
 }
 
 async function loadLevelObstacleTextures(level) {
@@ -2797,9 +2814,9 @@ function addToyHouseStaticRect(x, y, width, height, options = {}) {
 
   const bodyOptions = {
     isStatic: true,
-    restitution: options.restitution ?? 0.22,
-    friction: options.friction ?? 0.18,
-    frictionStatic: options.frictionStatic ?? 0.04,
+    restitution: options.restitution ?? 0.04,
+    friction: options.friction ?? 0.82,
+    frictionStatic: options.frictionStatic ?? 0.86,
   };
   if (options.collisionFilter) {
     bodyOptions.collisionFilter = options.collisionFilter;
@@ -2835,21 +2852,21 @@ function drawToyHouseFurniture(container, cakeTexture) {
     const cakeScale = TOY_HOUSE_CAKE_WIDTH / (cake.texture.width || TOY_HOUSE_CAKE_WIDTH);
     cake.scale.set(cakeScale);
     cake.position.set(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y);
-    cake.zIndex = 5;
+    cake.zIndex = 9;
     container.addChild(cake);
     addToyHouseStaticRect(
       TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2,
       TOY_HOUSE_CAKE_SURFACE_Y,
       TOY_HOUSE_CAKE_SURFACE_WIDTH,
       18,
-      { restitution: 0.18, friction: 0.72 },
+      { restitution: 0.02, friction: 0.92, frictionStatic: 0.94 },
     );
     addToyHouseStaticRect(
       TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.36,
       TOY_HOUSE_CAKE_SURFACE_Y + 30,
       TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.72,
       18,
-      { restitution: 0.12, friction: 0.78 },
+      { restitution: 0.02, friction: 0.94, frictionStatic: 0.96 },
     );
   } else {
     const cake = new PIXI.Graphics();
@@ -2859,28 +2876,29 @@ function drawToyHouseFurniture(container, cakeTexture) {
     cake.beginFill(0xffc45a, 0.94);
     cake.drawEllipse(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y - 16, TOY_HOUSE_CAKE_WIDTH * 0.42, 32);
     cake.endFill();
-    cake.zIndex = 5;
+    cake.zIndex = 9;
     container.addChild(cake);
     addToyHouseStaticRect(
       TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2,
       TOY_HOUSE_CAKE_SURFACE_Y,
       TOY_HOUSE_CAKE_SURFACE_WIDTH,
       18,
-      { restitution: 0.18, friction: 0.72 },
+      { restitution: 0.02, friction: 0.92, frictionStatic: 0.94 },
     );
   }
 
   addToyHouseStaticRect(0, TOY_HOUSE_FLOOR_Y, DESIGN_WIDTH, 86, {
-    restitution: 0.16,
-    friction: 0.82,
-    frictionStatic: 0.68,
+    restitution: 0.02,
+    friction: 0.96,
+    frictionStatic: 0.98,
   });
   addToyHouseStaticRect(0, TOY_HOUSE_PLAY_TOP_Y - 18, DESIGN_WIDTH, 18, {
-    restitution: 0.08,
-    friction: 0.5,
+    restitution: 0.02,
+    friction: 0.86,
+    frictionStatic: 0.9,
   });
-  addToyHouseStaticRect(-78, 110, 92, 864, { restitution: 0.12, friction: 0.72 });
-  addToyHouseStaticRect(DESIGN_WIDTH - 14, 110, 92, 864, { restitution: 0.12, friction: 0.72 });
+  addToyHouseStaticRect(-78, 110, 92, 864, { restitution: 0.03, friction: 0.9, frictionStatic: 0.94 });
+  addToyHouseStaticRect(DESIGN_WIDTH - 14, 110, 92, 864, { restitution: 0.03, friction: 0.9, frictionStatic: 0.94 });
 }
 
 function makeToyHouseTsumView(texture, isBucket) {
@@ -2946,6 +2964,7 @@ function startToyHouseDrag(toy, event) {
   activateMobileSession();
   playToyHouseTouchSound();
   const point = getPointerPosition(event);
+  const bodyHeight = toy.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
   toyHouseDrag = {
     toy,
     pointerId: event?.pointerId ?? 0,
@@ -2957,13 +2976,14 @@ function startToyHouseDrag(toy, event) {
     moved: 0,
   };
   toy.isDragged = true;
+  toy.isPlaced = false;
   toy.view.zIndex = 40;
   Body.setVelocity(toy.body, { x: 0, y: 0 });
   Body.setAngularVelocity(toy.body, 0);
   Body.setStatic(toy.body, true);
   Body.setPosition(toy.body, {
     x: clamp(point.x + toyHouseDrag.offsetX, 28, DESIGN_WIDTH - 28),
-    y: clamp(point.y + toyHouseDrag.offsetY - 30, TOY_HOUSE_PLAY_TOP_Y, TOY_HOUSE_FLOOR_Y - 28),
+    y: clamp(point.y + toyHouseDrag.offsetY - 30, TOY_HOUSE_PLAY_TOP_Y, TOY_HOUSE_FLOOR_Y - bodyHeight / 2 - 4),
   });
   createToyHouseHeartBubble(toy.body.position.x, toy.body.position.y);
   triggerHaptic(28);
@@ -2980,8 +3000,9 @@ function dragToyHouseTsum(event) {
   event?.stopPropagation?.();
   const point = getPointerPosition(event);
   const now = performance.now();
+  const bodyHeight = toyHouseDrag.toy.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
   const nextX = clamp(point.x + toyHouseDrag.offsetX, 24, DESIGN_WIDTH - 24);
-  const nextY = clamp(point.y + toyHouseDrag.offsetY - 30, TOY_HOUSE_PLAY_TOP_Y, TOY_HOUSE_FLOOR_Y - 30);
+  const nextY = clamp(point.y + toyHouseDrag.offsetY - 30, TOY_HOUSE_PLAY_TOP_Y, TOY_HOUSE_FLOOR_Y - bodyHeight / 2 - 4);
   toyHouseDrag.moved += Math.hypot(point.x - toyHouseDrag.lastX, point.y - toyHouseDrag.lastY);
   toyHouseDrag.lastX = point.x;
   toyHouseDrag.lastY = point.y;
@@ -3001,17 +3022,17 @@ function releaseToyHouseDrag(event) {
   event?.stopPropagation?.();
   const point = event ? getPointerPosition(event) : { x: toyHouseDrag.lastX, y: toyHouseDrag.lastY };
   const toy = toyHouseDrag.toy;
-  const flingX = clamp((point.x - toyHouseDrag.lastX) * 0.18, -3.2, 3.2);
-  const gentleLift = toyHouseDrag.moved < 8 ? -4.8 : -1.4;
+  const flingX = clamp((point.x - toyHouseDrag.lastX) * 0.08, -1.8, 1.8);
   toyHouseDrag = null;
   toy.isDragged = false;
-  toy.manualUntil = performance.now() + 3200;
+  toy.isPlaced = true;
+  toy.manualUntil = performance.now() + 700;
   Body.setStatic(toy.body, false);
   Body.setVelocity(toy.body, {
-    x: toy.body.velocity.x + flingX,
-    y: Math.min(toy.body.velocity.y, gentleLift),
+    x: flingX,
+    y: Math.max(toy.body.velocity.y, 0.15),
   });
-  Body.setAngularVelocity(toy.body, clamp(toy.body.angularVelocity + flingX * 0.04, -0.16, 0.16));
+  Body.setAngularVelocity(toy.body, clamp(flingX * 0.025, -0.06, 0.06));
 }
 
 function updateToyHouseEffects() {
@@ -3032,15 +3053,17 @@ function updateToyHouseEffects() {
 
 function resetEscapedToyHouseTsum(toy, now) {
   const x = clamp(toy.homeX + (Math.random() - 0.5) * 36, 42, DESIGN_WIDTH - 42);
-  const y = TOY_HOUSE_PLAY_TOP_Y + 70 + Math.random() * 120;
+  const bodyHeight = toy.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
+  const y = TOY_HOUSE_FLOOR_Y - bodyHeight / 2 - 22 - Math.random() * 84;
   Body.setStatic(toy.body, false);
   Body.setPosition(toy.body, { x, y });
   Body.setVelocity(toy.body, {
-    x: (Math.random() - 0.5) * 0.8,
-    y: 0.2 + Math.random() * 0.7,
+    x: 0,
+    y: 0.2,
   });
-  Body.setAngularVelocity(toy.body, (Math.random() - 0.5) * 0.05);
-  toy.manualUntil = now + 900 + Math.random() * 900;
+  Body.setAngularVelocity(toy.body, 0);
+  toy.isPlaced = true;
+  toy.manualUntil = now + 600;
   toy.nextTurnAt = now + 1200 + Math.random() * 1800;
   toy.nextJumpAt = now + 1800 + Math.random() * 2600;
 }
@@ -3074,13 +3097,34 @@ function updateToyHouse(now, delta) {
       continue;
     }
 
+    const bodyHeight = toy.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
     const manualResting = now < (toy.manualUntil || 0);
     const onCake = (
-      Math.abs(toy.body.position.y - (TOY_HOUSE_CAKE_SURFACE_Y - TOY_HOUSE_BODY_HEIGHT / 2)) < 22
+      Math.abs(toy.body.position.y - (TOY_HOUSE_CAKE_SURFACE_Y - bodyHeight / 2)) < 24
       && Math.abs(toy.body.position.x - TOY_HOUSE_CAKE_X) < TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.54
     );
-    const onFloor = toy.body.position.y >= TOY_HOUSE_FLOOR_Y - TOY_HOUSE_BODY_HEIGHT - 9;
-    const grounded = (onFloor || onCake) && Math.abs(toy.body.velocity.y) < 1.45;
+    const onFloor = toy.body.position.y >= TOY_HOUSE_FLOOR_Y - bodyHeight / 2 - 10;
+    const grounded = (onFloor || onCake) && Math.abs(toy.body.velocity.y) < 1.25;
+
+    if (toy.isPlaced) {
+      if (grounded || Math.abs(toy.body.velocity.x) > 0.05 || Math.abs(toy.body.angularVelocity) > 0.01) {
+        Body.setVelocity(toy.body, {
+          x: toy.body.velocity.x * 0.92,
+          y: toy.body.velocity.y,
+        });
+        Body.setAngularVelocity(toy.body, toy.body.angularVelocity * 0.9);
+      }
+      toy.view.position.set(toy.body.position.x, toy.body.position.y);
+      toy.view.rotation = toy.body.angle * 0.18;
+      toy.view.zIndex = 12 + toy.body.position.y / 1000;
+      if (toy.view._toySprite) {
+        const squash = grounded ? 1 : 1 + Math.min(0.06, Math.abs(toy.body.velocity.y) * 0.004);
+        const base = toy.view._toySprite._baseToyScale || { x: 1, y: 1 };
+        toy.view._toySprite.scale.y = base.y * squash;
+        toy.view._toySprite.scale.x = base.x / squash;
+      }
+      continue;
+    }
 
     if (!manualResting && grounded && onFloor && now > toy.nextCakeJumpAt) {
       const towardCake = clamp((TOY_HOUSE_CAKE_X - toy.body.position.x) * 0.035, -3.4, 3.4);
@@ -3192,20 +3236,22 @@ function addToyHouseTsumEntry(entry, index, layout) {
   const col = index % layout.columns;
   const row = Math.floor(index / layout.columns);
   const homeX = 46 + col * layout.colStep;
+  const bodyWidth = entry.isBucket ? TOY_HOUSE_BODY_WIDTH : TOY_HOUSE_BODY_WIDTH - 4;
+  const bodyHeight = entry.isBucket ? TOY_HOUSE_BODY_HEIGHT : TOY_HOUSE_BODY_HEIGHT - 4;
   const x = homeX + (Math.random() - 0.5) * 12;
   const y = layout.startY + row * layout.rowStep + (Math.random() - 0.5) * 10;
   const body = Bodies.rectangle(
     clamp(x, 28, DESIGN_WIDTH - 28),
-    clamp(y, 170, TOY_HOUSE_FLOOR_Y - 70),
-    TOY_HOUSE_BODY_WIDTH,
-    TOY_HOUSE_BODY_HEIGHT,
+    clamp(y, TOY_HOUSE_PLAY_TOP_Y + 28, TOY_HOUSE_FLOOR_Y - bodyHeight / 2 - 10),
+    bodyWidth,
+    bodyHeight,
     {
-      restitution: 0.14,
-      friction: 0.42,
-      frictionStatic: 0.64,
-      frictionAir: 0.024,
-      density: 0.00145,
-      slop: 0.06,
+      restitution: 0.035,
+      friction: 0.78,
+      frictionStatic: 0.94,
+      frictionAir: 0.032,
+      density: 0.00165,
+      slop: 0.035,
       chamfer: { radius: 12 },
       collisionFilter: {
         category: TOY_HOUSE_TOY_CATEGORY,
@@ -3214,10 +3260,10 @@ function addToyHouseTsumEntry(entry, index, layout) {
     },
   );
   Body.setVelocity(body, {
-    x: (Math.random() - 0.5) * 1.2,
-    y: 0.25 + Math.random() * 0.8,
+    x: (Math.random() - 0.5) * 0.18,
+    y: 0,
   });
-  Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.05);
+  Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.018);
   Composite.add(toyHouseEngine.world, body);
 
   const view = makeToyHouseTsumView(entry.texture, entry.isBucket);
@@ -3227,6 +3273,8 @@ function addToyHouseTsumEntry(entry, index, layout) {
   view.cursor = "pointer";
   const toy = {
     body,
+    bodyWidth,
+    bodyHeight,
     view,
     spriteId: entry.id,
     direction: Math.random() < 0.5 ? -1 : 1,
@@ -3237,8 +3285,9 @@ function addToyHouseTsumEntry(entry, index, layout) {
     nextTurnAt: layout.now + 900 + Math.random() * 2100,
     nextJumpAt: layout.now + 1100 + Math.random() * 2800,
     nextCakeJumpAt: layout.now + 1600 + Math.random() * 5200,
-    manualUntil: layout.now + 1300 + Math.random() * 1200,
+    manualUntil: layout.now + 800 + Math.random() * 700,
     isDragged: false,
+    isPlaced: true,
   };
   view.on("pointerdown", (event) => startToyHouseDrag(toy, event));
   toyHouseRoomLayer.addChild(view);
@@ -3293,11 +3342,14 @@ async function populateToyHouseRoom(roomIndex) {
   const count = room.ids.length;
   const columns = clamp(Math.ceil(Math.sqrt(Math.max(1, count) * 1.45)), 5, 9);
   const colStep = columns > 1 ? (DESIGN_WIDTH - 92) / (columns - 1) : 0;
+  const rows = Math.max(1, Math.ceil(count / columns));
+  const rowStep = TOY_HOUSE_BODY_HEIGHT + 8;
+  const bottomY = TOY_HOUSE_FLOOR_Y - TOY_HOUSE_BODY_HEIGHT / 2 - 12;
   const layout = {
     columns,
     colStep,
-    rowStep: 43,
-    startY: count > 26 ? 356 : 430,
+    rowStep,
+    startY: clamp(bottomY - (rows - 1) * rowStep, TOY_HOUSE_PLAY_TOP_Y + 36, bottomY),
     now: performance.now(),
   };
 
@@ -3351,10 +3403,10 @@ async function showToyHouse() {
   destroyToyHouse();
 
   toyHouseEngine = Engine.create({
-    gravity: { x: 0, y: 1.05, scale: 0.001 },
-    positionIterations: 8,
-    velocityIterations: 6,
-    constraintIterations: 3,
+    gravity: { x: 0, y: 0.82, scale: 0.001 },
+    positionIterations: 12,
+    velocityIterations: 8,
+    constraintIterations: 4,
   });
 
   toyHouseContainer = new PIXI.Container();
@@ -5386,6 +5438,43 @@ function hideLevelSelect() {
   }
 }
 
+function selectHero(hero) {
+  selectedHero = hero;
+  selectedHeroId = hero.id;
+  window.localStorage.setItem(HERO_STORAGE_KEY, hero.id);
+  loadHeroTexture().then(() => {
+    updateHeroUi();
+    showLevelSelect();
+  }).catch(showFatalError);
+}
+
+function createHomeHeroShortcut(hero, index) {
+  const selected = hero.id === selectedHeroId;
+  const button = new PIXI.Container();
+  const bg = new PIXI.Graphics();
+  bg.beginFill(selected ? 0x2d5f58 : 0x111820, 0.94);
+  bg.lineStyle(3, selected ? 0xfff176 : 0xffffff, selected ? 0.92 : 0.22);
+  bg.drawCircle(0, 0, 23);
+  bg.endFill();
+  button.addChild(bg);
+
+  const avatar = new PIXI.Sprite(getHeroTexture(hero));
+  avatar.anchor.set(0.5);
+  avatar.width = 38;
+  avatar.height = 38;
+  button.addChild(avatar);
+
+  button.position.set(42 + index * 52, DESIGN_HEIGHT - 42);
+  button.eventMode = "static";
+  button.cursor = "pointer";
+  button.on("pointerdown", (event) => event.stopPropagation());
+  button.on("pointertap", (event) => {
+    event.stopPropagation();
+    selectHero(hero);
+  });
+  return button;
+}
+
 function showLevelSelect() {
   if (levelStartInProgress) {
     return;
@@ -5545,7 +5634,7 @@ function showLevelSelect() {
     bg.endFill();
     button.addChild(bg);
 
-    const avatar = new PIXI.Sprite(heroTextures.get(hero.id) || PIXI.Texture.WHITE);
+    const avatar = new PIXI.Sprite(getHeroTexture(hero));
     avatar.anchor.set(0.5);
     avatar.width = 44;
     avatar.height = 44;
@@ -5569,13 +5658,7 @@ function showLevelSelect() {
     button.on("pointerdown", (event) => event.stopPropagation());
     button.on("pointertap", (event) => {
       event.stopPropagation();
-      selectedHero = hero;
-      selectedHeroId = hero.id;
-      window.localStorage.setItem(HERO_STORAGE_KEY, hero.id);
-      loadHeroTexture().then(() => {
-        updateHeroUi();
-        showLevelSelect();
-      }).catch(showFatalError);
+      selectHero(hero);
     });
     levelSelectContainer.addChild(button);
   });
@@ -5590,6 +5673,10 @@ function showLevelSelect() {
   });
   heroDesc.position.set(34, 824);
   levelSelectContainer.addChild(heroDesc);
+
+  HEROES.slice(0, HOME_HERO_SHORTCUT_COUNT).forEach((hero, index) => {
+    levelSelectContainer.addChild(createHomeHeroShortcut(hero, index));
+  });
 
   app.stage.addChild(levelSelectContainer);
   updateHudForLevel();
@@ -5817,7 +5904,7 @@ async function main() {
   setupInput();
   startPhysics();
   startTicker();
-  await loadHeroTexture();
+  await Promise.all([loadHeroTexture(), loadHomeHeroShortcutTextures()]);
   showLevelSelect();
 
   if (loadingEl) {
