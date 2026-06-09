@@ -133,6 +133,7 @@ const TOY_HOUSE_BASE_NAME_ALIASES = {
   hector: "Hector Rivera",
   "hector skill": "Hector Rivera",
   "hiro": "Hiro Hamada",
+  judy: "Judy Hopps",
   "king rapunzel": "Rapunzel",
   "littlenoi": "Littlenoi",
   "luca monster": "Luca Paguro",
