@@ -59,6 +59,7 @@ const COLLECTION_GRID_BATCH_SIZE = 28;
 const COLLECTION_BATCH_DELAY_MS = 18;
 const TOY_HOUSE_ROOM_LOAD_BATCH_SIZE = 8;
 const HOME_HERO_SHORTCUT_COUNT = 3;
+const TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS = 7200;
 
 const VILLAIN_SPRITE_IDS = [
   19, 22, 34, 37, 39, 42, 55, 63, 67, 72, 73, 74, 75, 80, 82, 90, 105, 121, 139, 141, 147, 183, 199, 203,
@@ -73,6 +74,8 @@ const TOY_HOUSE_BODY_WIDTH = 42;
 const TOY_HOUSE_BODY_HEIGHT = 44;
 const TOY_HOUSE_SPRITE_MAX_WIDTH = 64;
 const TOY_HOUSE_SPRITE_MAX_HEIGHT = 66;
+const TOY_HOUSE_GENERATED_SPRITE_MAX_WIDTH = 44;
+const TOY_HOUSE_GENERATED_SPRITE_MAX_HEIGHT = 42;
 const TOY_HOUSE_FALLBACK_SPRITE_SIZE = 42;
 const TOY_HOUSE_CAKE_X = DESIGN_WIDTH / 2;
 const TOY_HOUSE_CAKE_Y = 616;
@@ -2772,10 +2775,17 @@ function fitSpriteCover(sprite, width, height) {
   sprite.position.set(width / 2, height / 2);
 }
 
+function getToyHouseStarterSpriteIds() {
+  return HEROES
+    .map((hero) => normalizeSpriteId(hero.assetId))
+    .filter(Boolean);
+}
+
 function getUnlockedToyHouseSpriteIds() {
-  return [...unlockedSprites]
-    .map(normalizeSpriteId)
-    .filter(Boolean)
+  return [...new Set([
+    ...getToyHouseStarterSpriteIds(),
+    ...[...unlockedSprites].map(normalizeSpriteId).filter(Boolean),
+  ])]
     .sort((a, b) => a - b);
 }
 
@@ -2833,12 +2843,31 @@ async function loadToyHouseTsumTexture(id, catalogMap) {
   const name = item.name || `松松 ${id}`;
   const baseName = getToyHouseBaseName(item);
   if (bucketPath) {
-    const texture = await loadPixiTextureWithFallback(bucketPath, getFallbackSpriteTexture(id));
-    return { id, name, baseName, texture, isBucket: true };
+    const bucketTexture = await loadPixiTextureWithFallback(bucketPath, null, TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS);
+    if (bucketTexture) {
+      return { id, name, baseName, texture: bucketTexture, isBucket: true, isOfficialBucket: true };
+    }
   }
 
-  const texture = await loadSpriteTextureWithFallback(id);
-  return { id, name, baseName, texture, isBucket: false };
+  const texture = await loadToyHouseCharacterTexture(id);
+  return { id, name, baseName, texture, isBucket: true, isOfficialBucket: false };
+}
+
+async function loadToyHouseCharacterTexture(id) {
+  const normalizedId = normalizeSpriteId(id);
+  if (!normalizedId) {
+    return null;
+  }
+
+  try {
+    return await withSoftTimeout(loadSpriteTexture(normalizedId), TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS, `toy sprite ${normalizedId}`);
+  } catch {
+    return loadPixiTextureWithFallback(
+      `collection_characters/${String(normalizedId).padStart(3, "0")}.webp`,
+      null,
+      TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS,
+    );
+  }
 }
 
 function fitToyHouseSprite(sprite, maxWidth, maxHeight) {
@@ -2847,6 +2876,47 @@ function fitToyHouseSprite(sprite, maxWidth, maxHeight) {
   const scale = Math.min(maxWidth / textureWidth, maxHeight / textureHeight);
   sprite.scale.set(scale);
   sprite._baseToyScale = { x: scale, y: scale };
+}
+
+function getToyHouseBucketPalette(id) {
+  const palette = [
+    { body: 0xffd36e, top: 0xffedaa, rim: 0xb46a2b, shadow: 0x8d4b22 },
+    { body: 0x78d6d3, top: 0xcdf8f3, rim: 0x268f9a, shadow: 0x176775 },
+    { body: 0xf69bc2, top: 0xffd9e9, rim: 0xb64f7f, shadow: 0x873a63 },
+    { body: 0x95cf72, top: 0xdff4b6, rim: 0x5d913b, shadow: 0x406a2d },
+    { body: 0x9eb7ff, top: 0xe0e7ff, rim: 0x596cc2, shadow: 0x3e4c8f },
+    { body: 0xffb06d, top: 0xffe1b8, rim: 0xb96336, shadow: 0x824225 },
+  ];
+  return palette[Math.floor(seededRandom((normalizeSpriteId(id) || 1) * 17) * palette.length) % palette.length];
+}
+
+function drawToyHouseGeneratedBucket(view, entry) {
+  const palette = getToyHouseBucketPalette(entry.id);
+  const bucket = new PIXI.Graphics();
+  bucket.beginFill(palette.shadow, 0.26);
+  bucket.drawEllipse(0, 24, 24, 7);
+  bucket.endFill();
+  bucket.beginFill(palette.body, 0.98);
+  bucket.drawRoundedRect(-23, -25, 46, 54, 14);
+  bucket.endFill();
+  bucket.beginFill(palette.top, 0.98);
+  bucket.drawEllipse(0, -24, 23, 10);
+  bucket.endFill();
+  bucket.beginFill(palette.rim, 0.3);
+  bucket.drawEllipse(0, 24, 21, 7);
+  bucket.endFill();
+  bucket.lineStyle(3, 0xffffff, 0.4);
+  bucket.drawRoundedRect(-23, -25, 46, 54, 14);
+  bucket.lineStyle(2, palette.rim, 0.58);
+  bucket.drawEllipse(0, -24, 23, 10);
+  bucket.drawEllipse(0, 24, 21, 7);
+  bucket.lineStyle(2, 0xffffff, 0.32);
+  bucket.moveTo(-13, -13);
+  bucket.lineTo(-13, 16);
+  bucket.moveTo(13, -13);
+  bucket.lineTo(13, 16);
+  bucket.zIndex = 1;
+  view.addChild(bucket);
 }
 
 function drawHeartShape(graphics, x, y, size, color, alpha = 1) {
@@ -3046,36 +3116,46 @@ async function drawToyHouseRoomDecor(room, token) {
   await Promise.all(getToyHouseDecorKeys(room).map((key, index) => addToyHouseDecorSprite(key, index, token)));
 }
 
-function makeToyHouseTsumView(texture, isBucket) {
+function makeToyHouseTsumView(entry) {
   const view = new PIXI.Container();
+  view.sortableChildren = true;
   const shadow = new PIXI.Graphics();
   shadow.beginFill(0x382816, 0.22);
   shadow.drawEllipse(0, 20, 22, 7);
   shadow.endFill();
+  shadow.zIndex = 0;
   view.addChild(shadow);
 
-  if (!isBucket) {
-    const body = new PIXI.Graphics();
-    body.beginFill(0xf7c65a, 0.9);
-    body.drawRoundedRect(-22, -6, 44, 36, 15);
-    body.beginFill(0xffdd84, 0.94);
-    body.drawEllipse(0, -6, 22, 9);
-    body.endFill();
-    body.lineStyle(2, 0xffffff, 0.26);
-    body.drawRoundedRect(-22, -6, 44, 36, 15);
-    view.addChild(body);
+  if (!entry.isOfficialBucket) {
+    drawToyHouseGeneratedBucket(view, entry);
   }
 
-  const sprite = new PIXI.Sprite(texture);
-  sprite.anchor.set(0.5);
-  fitToyHouseSprite(
-    sprite,
-    isBucket ? TOY_HOUSE_SPRITE_MAX_WIDTH : TOY_HOUSE_FALLBACK_SPRITE_SIZE,
-    isBucket ? TOY_HOUSE_SPRITE_MAX_HEIGHT : TOY_HOUSE_FALLBACK_SPRITE_SIZE,
-  );
-  sprite.position.set(0, isBucket ? -8 : -16);
-  view.addChild(sprite);
-  view._toySprite = sprite;
+  if (entry.texture) {
+    const sprite = new PIXI.Sprite(entry.texture);
+    sprite.anchor.set(0.5);
+    fitToyHouseSprite(
+      sprite,
+      entry.isOfficialBucket ? TOY_HOUSE_SPRITE_MAX_WIDTH : TOY_HOUSE_GENERATED_SPRITE_MAX_WIDTH,
+      entry.isOfficialBucket ? TOY_HOUSE_SPRITE_MAX_HEIGHT : TOY_HOUSE_GENERATED_SPRITE_MAX_HEIGHT,
+    );
+    sprite.position.set(0, entry.isOfficialBucket ? -8 : -4);
+    sprite.zIndex = 2;
+    view.addChild(sprite);
+    view._toySprite = sprite;
+  } else {
+    const label = new PIXI.Text(String(entry.name || entry.id).slice(0, 2), {
+      fill: 0x62371f,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 14,
+      fontWeight: "900",
+      stroke: 0xffffff,
+      strokeThickness: 3,
+    });
+    label.anchor.set(0.5);
+    label.position.set(0, -4);
+    label.zIndex = 3;
+    view.addChild(label);
+  }
   return view;
 }
 
@@ -3141,6 +3221,8 @@ function startToyHouseDrag(toy, event) {
   };
   toy.isDragged = true;
   toy.isPlaced = false;
+  toy.isStackLocked = false;
+  toy.stackSupportId = null;
   toy.view.zIndex = 40;
   Body.setVelocity(toy.body, { x: 0, y: 0 });
   Body.setAngularVelocity(toy.body, 0);
@@ -3189,14 +3271,14 @@ function getToyHouseStackSupport(toy) {
     const otherHeight = other.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
     const otherWidth = other.bodyWidth || TOY_HOUSE_BODY_WIDTH;
     const otherTop = other.body.position.y - otherHeight / 2;
-    const horizontalLimit = (bodyWidth + otherWidth) * 0.48;
+    const horizontalLimit = (bodyWidth + otherWidth) * 0.62;
     const horizontalDistance = Math.abs(toy.body.position.x - other.body.position.x);
     const verticalDistance = Math.abs(toyBottom - otherTop);
     if (
       horizontalDistance <= horizontalLimit
       && toy.body.position.y < other.body.position.y
-      && toyBottom >= otherTop - 30
-      && toyBottom <= otherTop + 48
+      && toyBottom >= otherTop - 46
+      && toyBottom <= otherTop + 82
       && verticalDistance < bestDistance
     ) {
       bestSupport = other;
@@ -3220,12 +3302,21 @@ function settleToyHouseStackPlacement(toy) {
   const offsetX = clamp(toy.body.position.x - support.body.position.x, -supportWidth * 0.18, supportWidth * 0.18);
   const x = clamp(support.body.position.x + offsetX, 24 + bodyWidth / 2, DESIGN_WIDTH - 24 - bodyWidth / 2);
   const y = support.body.position.y - supportHeight / 2 - bodyHeight / 2 + 1;
+  const now = performance.now();
 
+  support.isPlaced = true;
+  support.isStackLocked = true;
+  support.manualUntil = now + 2200;
+  Body.setStatic(support.body, true);
+  Body.setVelocity(support.body, { x: 0, y: 0 });
+  Body.setAngularVelocity(support.body, 0);
   Body.setPosition(toy.body, { x, y });
   Body.setAngle(toy.body, clamp(toy.body.angle * 0.16, -0.08, 0.08));
   toy.homeX = x;
   toy.targetX = x;
-  toy.manualUntil = performance.now() + 1600;
+  toy.manualUntil = now + 2200;
+  toy.isStackLocked = true;
+  toy.stackSupportId = support.spriteId;
   return true;
 }
 
@@ -3246,12 +3337,16 @@ function releaseToyHouseDrag(event) {
   toy.isPlaced = true;
   toy.manualUntil = performance.now() + 700;
   const snappedToStack = settleToyHouseStackPlacement(toy);
-  Body.setStatic(toy.body, false);
+  Body.setStatic(toy.body, snappedToStack);
   Body.setVelocity(toy.body, {
     x: snappedToStack ? 0 : flingX * 0.35,
-    y: snappedToStack ? 0.04 : Math.max(toy.body.velocity.y, 0.12),
+    y: snappedToStack ? 0 : Math.max(toy.body.velocity.y, 0.12),
   });
   Body.setAngularVelocity(toy.body, snappedToStack ? 0 : clamp(flingX * 0.012, -0.035, 0.035));
+  if (!snappedToStack) {
+    toy.isStackLocked = false;
+    toy.stackSupportId = null;
+  }
 }
 
 function updateToyHouseEffects() {
@@ -3282,6 +3377,8 @@ function resetEscapedToyHouseTsum(toy, now) {
   });
   Body.setAngularVelocity(toy.body, 0);
   toy.isPlaced = true;
+  toy.isStackLocked = false;
+  toy.stackSupportId = null;
   toy.manualUntil = now + 600;
   toy.nextTurnAt = now + 1200 + Math.random() * 1800;
   toy.nextJumpAt = now + 1800 + Math.random() * 2600;
@@ -3313,6 +3410,13 @@ function updateToyHouse(now, delta) {
     if (toy.isDragged) {
       toy.view.position.set(toy.body.position.x, toy.body.position.y);
       toy.view.rotation = toy.body.angle * 0.18;
+      continue;
+    }
+
+    if (toy.isStackLocked) {
+      toy.view.position.set(toy.body.position.x, toy.body.position.y);
+      toy.view.rotation = toy.body.angle * 0.12;
+      toy.view.zIndex = 13 + toy.body.position.y / 1000;
       continue;
     }
 
@@ -3456,8 +3560,8 @@ function addToyHouseTsumEntry(entry, index, layout) {
   const col = index % layout.columns;
   const row = Math.floor(index / layout.columns);
   const homeX = 46 + col * layout.colStep;
-  const bodyWidth = entry.isBucket ? TOY_HOUSE_BODY_WIDTH : TOY_HOUSE_BODY_WIDTH - 4;
-  const bodyHeight = entry.isBucket ? TOY_HOUSE_BODY_HEIGHT : TOY_HOUSE_BODY_HEIGHT - 4;
+  const bodyWidth = TOY_HOUSE_BODY_WIDTH;
+  const bodyHeight = TOY_HOUSE_BODY_HEIGHT;
   const x = homeX + (Math.random() - 0.5) * 12;
   const y = layout.startY + row * layout.rowStep + (Math.random() - 0.5) * 10;
   const body = Bodies.rectangle(
@@ -3486,7 +3590,7 @@ function addToyHouseTsumEntry(entry, index, layout) {
   Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.018);
   Composite.add(toyHouseEngine.world, body);
 
-  const view = makeToyHouseTsumView(entry.texture, entry.isBucket);
+  const view = makeToyHouseTsumView(entry);
   view.position.set(body.position.x, body.position.y);
   view.zIndex = 12;
   view.eventMode = "static";
@@ -3500,6 +3604,7 @@ function addToyHouseTsumEntry(entry, index, layout) {
     name: entry.name,
     baseName: entry.baseName,
     isBucket: entry.isBucket,
+    isOfficialBucket: entry.isOfficialBucket,
     direction: Math.random() < 0.5 ? -1 : 1,
     homeX: clamp(homeX, 34, DESIGN_WIDTH - 34),
     targetX: clamp(x + (Math.random() - 0.5) * 48, 34, DESIGN_WIDTH - 34),
@@ -3511,6 +3616,8 @@ function addToyHouseTsumEntry(entry, index, layout) {
     manualUntil: layout.now + 800 + Math.random() * 700,
     isDragged: false,
     isPlaced: true,
+    isStackLocked: false,
+    stackSupportId: null,
   };
   view.on("pointerdown", (event) => startToyHouseDrag(toy, event));
   toyHouseRoomLayer.addChild(view);
