@@ -74,9 +74,6 @@ const TOY_HOUSE_BODY_WIDTH = 42;
 const TOY_HOUSE_BODY_HEIGHT = 44;
 const TOY_HOUSE_SPRITE_MAX_WIDTH = 64;
 const TOY_HOUSE_SPRITE_MAX_HEIGHT = 66;
-const TOY_HOUSE_GENERATED_SPRITE_MAX_WIDTH = 44;
-const TOY_HOUSE_GENERATED_SPRITE_MAX_HEIGHT = 42;
-const TOY_HOUSE_FALLBACK_SPRITE_SIZE = 42;
 const TOY_HOUSE_CAKE_X = DESIGN_WIDTH / 2;
 const TOY_HOUSE_CAKE_Y = 616;
 const TOY_HOUSE_CAKE_WIDTH = 372;
@@ -355,7 +352,15 @@ const HEROES = [
   { id: "minnie", name: "米妮", assetId: 154, skillName: "甜心横线", skill: "horizontal", description: "滑动选择一行，释放横向清除" },
   { id: "donald", name: "唐老鸭", assetId: 286, skillName: "暴跳震波", skill: "shock", description: "滑动指定中心，震开并清除松松" },
   { id: "daisy", name: "黛丝", assetId: 174, skillName: "花束转化", skill: "convert", description: "滑动指定区域，把松松变为同伴" },
-  { id: "goofy", name: "高飞", assetId: 120, skillName: "高飞竖线", skill: "vertical", description: "滑动选择一列，释放纵向清除" },
+  {
+    id: "goofy",
+    name: "高飞",
+    assetId: 197,
+    avatarPath: "sszdy_assets/Sprite_Sprite_68372.png?v=67",
+    skillName: "高飞竖线",
+    skill: "vertical",
+    description: "滑动选择一列，释放纵向清除",
+  },
 ];
 
 const BOSS_POOL = VILLAIN_ROSTER;
@@ -715,6 +720,7 @@ let toyHouseTsums = [];
 let toyHouseEffects = [];
 let toyHouseRoomStaticBodies = [];
 let toyHouseRooms = [];
+let toyHouseMissingOfficialAssetIds = [];
 let toyHouseRoomIndex = 0;
 let toyHouseRoomRenderToken = 0;
 let toyHouseRoomTitleText = null;
@@ -1322,23 +1328,25 @@ async function loadRoundTextures() {
 }
 
 async function loadHeroTexture() {
-  if (heroTextures.has(selectedHero.id)) {
-    selectedHeroTexture = heroTextures.get(selectedHero.id);
-    return;
+  selectedHeroTexture = await loadSpriteTextureWithFallback(selectedHero.assetId);
+  await loadHeroAvatarTexture(selectedHero);
+}
+
+async function loadHeroAvatarTexture(hero) {
+  if (heroTextures.has(hero.id)) {
+    return heroTextures.get(hero.id);
   }
 
-  selectedHeroTexture = await loadSpriteTextureWithFallback(selectedHero.assetId);
-  heroTextures.set(selectedHero.id, selectedHeroTexture);
+  const avatarTexture = hero.avatarPath
+    ? await loadPixiTextureWithFallback(hero.avatarPath, null, SPRITE_TEXTURE_SOFT_TIMEOUT_MS)
+    : null;
+  const texture = avatarTexture || await loadSpriteTextureWithFallback(hero.assetId);
+  heroTextures.set(hero.id, texture);
+  return texture;
 }
 
 async function loadHomeHeroShortcutTextures() {
-  await Promise.all(HEROES.slice(0, HOME_HERO_SHORTCUT_COUNT).map(async (hero) => {
-    if (heroTextures.has(hero.id)) {
-      return;
-    }
-    const texture = await loadSpriteTextureWithFallback(hero.assetId);
-    heroTextures.set(hero.id, texture);
-  }));
+  await Promise.all(HEROES.map(loadHeroAvatarTexture));
 }
 
 function getHeroTexture(hero) {
@@ -1362,11 +1370,8 @@ async function loadLevelObstacleTextures(level) {
 }
 
 async function loadHeroTextures() {
-  await Promise.all(HEROES.map(async (hero) => {
-    const texture = await loadSpriteTextureWithFallback(hero.assetId);
-    heroTextures.set(hero.id, texture);
-  }));
-  selectedHeroTexture = heroTextures.get(selectedHero.id) || selectedHeroTexture;
+  await Promise.all(HEROES.map(loadHeroAvatarTexture));
+  selectedHeroTexture = await loadSpriteTextureWithFallback(selectedHero.assetId);
 }
 
 function loadImage(src) {
@@ -2808,11 +2813,17 @@ function getToyHouseCatalogItem(id, catalogMap) {
 
 function buildToyHouseRooms(unlockedIds, catalogMap) {
   const roomsByKey = new Map();
+  const missingOfficialAssetIds = [];
   const roomOrder = new Map(TOY_HOUSE_ROOM_DEFINITIONS.map((room, index) => [room.key, index]));
   roomOrder.set(TOY_HOUSE_FALLBACK_ROOM.key, TOY_HOUSE_ROOM_DEFINITIONS.length + 1);
 
   for (const id of unlockedIds) {
     const item = getToyHouseCatalogItem(id, catalogMap);
+    if (!getToyHouseBucketAssetPath(item)) {
+      missingOfficialAssetIds.push(id);
+      continue;
+    }
+
     const roomDef = getToyHouseRoomDefinition(item);
     if (!roomsByKey.has(roomDef.key)) {
       roomsByKey.set(roomDef.key, {
@@ -2824,6 +2835,8 @@ function buildToyHouseRooms(unlockedIds, catalogMap) {
     }
     roomsByKey.get(roomDef.key).ids.push(id);
   }
+
+  toyHouseMissingOfficialAssetIds = missingOfficialAssetIds;
 
   return [...roomsByKey.values()]
     .map((room) => ({
@@ -2842,32 +2855,16 @@ async function loadToyHouseTsumTexture(id, catalogMap) {
   const bucketPath = getToyHouseBucketAssetPath(item);
   const name = item.name || `松松 ${id}`;
   const baseName = getToyHouseBaseName(item);
-  if (bucketPath) {
-    const bucketTexture = await loadPixiTextureWithFallback(bucketPath, null, TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS);
-    if (bucketTexture) {
-      return { id, name, baseName, texture: bucketTexture, isBucket: true, isOfficialBucket: true };
-    }
-  }
-
-  const texture = await loadToyHouseCharacterTexture(id);
-  return { id, name, baseName, texture, isBucket: true, isOfficialBucket: false };
-}
-
-async function loadToyHouseCharacterTexture(id) {
-  const normalizedId = normalizeSpriteId(id);
-  if (!normalizedId) {
+  if (!bucketPath) {
     return null;
   }
 
-  try {
-    return await withSoftTimeout(loadSpriteTexture(normalizedId), TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS, `toy sprite ${normalizedId}`);
-  } catch {
-    return loadPixiTextureWithFallback(
-      `collection_characters/${String(normalizedId).padStart(3, "0")}.webp`,
-      null,
-      TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS,
-    );
+  const bucketTexture = await loadPixiTextureWithFallback(bucketPath, null, TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS);
+  if (!bucketTexture) {
+    return null;
   }
+
+  return { id, name, baseName, texture: bucketTexture, isBucket: true, isOfficialBucket: true, assetPath: bucketPath };
 }
 
 function fitToyHouseSprite(sprite, maxWidth, maxHeight) {
@@ -2876,47 +2873,6 @@ function fitToyHouseSprite(sprite, maxWidth, maxHeight) {
   const scale = Math.min(maxWidth / textureWidth, maxHeight / textureHeight);
   sprite.scale.set(scale);
   sprite._baseToyScale = { x: scale, y: scale };
-}
-
-function getToyHouseBucketPalette(id) {
-  const palette = [
-    { body: 0xffd36e, top: 0xffedaa, rim: 0xb46a2b, shadow: 0x8d4b22 },
-    { body: 0x78d6d3, top: 0xcdf8f3, rim: 0x268f9a, shadow: 0x176775 },
-    { body: 0xf69bc2, top: 0xffd9e9, rim: 0xb64f7f, shadow: 0x873a63 },
-    { body: 0x95cf72, top: 0xdff4b6, rim: 0x5d913b, shadow: 0x406a2d },
-    { body: 0x9eb7ff, top: 0xe0e7ff, rim: 0x596cc2, shadow: 0x3e4c8f },
-    { body: 0xffb06d, top: 0xffe1b8, rim: 0xb96336, shadow: 0x824225 },
-  ];
-  return palette[Math.floor(seededRandom((normalizeSpriteId(id) || 1) * 17) * palette.length) % palette.length];
-}
-
-function drawToyHouseGeneratedBucket(view, entry) {
-  const palette = getToyHouseBucketPalette(entry.id);
-  const bucket = new PIXI.Graphics();
-  bucket.beginFill(palette.shadow, 0.26);
-  bucket.drawEllipse(0, 24, 24, 7);
-  bucket.endFill();
-  bucket.beginFill(palette.body, 0.98);
-  bucket.drawRoundedRect(-23, -25, 46, 54, 14);
-  bucket.endFill();
-  bucket.beginFill(palette.top, 0.98);
-  bucket.drawEllipse(0, -24, 23, 10);
-  bucket.endFill();
-  bucket.beginFill(palette.rim, 0.3);
-  bucket.drawEllipse(0, 24, 21, 7);
-  bucket.endFill();
-  bucket.lineStyle(3, 0xffffff, 0.4);
-  bucket.drawRoundedRect(-23, -25, 46, 54, 14);
-  bucket.lineStyle(2, palette.rim, 0.58);
-  bucket.drawEllipse(0, -24, 23, 10);
-  bucket.drawEllipse(0, 24, 21, 7);
-  bucket.lineStyle(2, 0xffffff, 0.32);
-  bucket.moveTo(-13, -13);
-  bucket.lineTo(-13, 16);
-  bucket.moveTo(13, -13);
-  bucket.lineTo(13, 16);
-  bucket.zIndex = 1;
-  view.addChild(bucket);
 }
 
 function drawHeartShape(graphics, x, y, size, color, alpha = 1) {
@@ -3126,36 +3082,13 @@ function makeToyHouseTsumView(entry) {
   shadow.zIndex = 0;
   view.addChild(shadow);
 
-  if (!entry.isOfficialBucket) {
-    drawToyHouseGeneratedBucket(view, entry);
-  }
-
-  if (entry.texture) {
-    const sprite = new PIXI.Sprite(entry.texture);
-    sprite.anchor.set(0.5);
-    fitToyHouseSprite(
-      sprite,
-      entry.isOfficialBucket ? TOY_HOUSE_SPRITE_MAX_WIDTH : TOY_HOUSE_GENERATED_SPRITE_MAX_WIDTH,
-      entry.isOfficialBucket ? TOY_HOUSE_SPRITE_MAX_HEIGHT : TOY_HOUSE_GENERATED_SPRITE_MAX_HEIGHT,
-    );
-    sprite.position.set(0, entry.isOfficialBucket ? -8 : -4);
-    sprite.zIndex = 2;
-    view.addChild(sprite);
-    view._toySprite = sprite;
-  } else {
-    const label = new PIXI.Text(String(entry.name || entry.id).slice(0, 2), {
-      fill: 0x62371f,
-      fontFamily: "Arial, Microsoft YaHei, sans-serif",
-      fontSize: 14,
-      fontWeight: "900",
-      stroke: 0xffffff,
-      strokeThickness: 3,
-    });
-    label.anchor.set(0.5);
-    label.position.set(0, -4);
-    label.zIndex = 3;
-    view.addChild(label);
-  }
+  const sprite = new PIXI.Sprite(entry.texture);
+  sprite.anchor.set(0.5);
+  fitToyHouseSprite(sprite, TOY_HOUSE_SPRITE_MAX_WIDTH, TOY_HOUSE_SPRITE_MAX_HEIGHT);
+  sprite.position.set(0, -8);
+  sprite.zIndex = 2;
+  view.addChild(sprite);
+  view._toySprite = sprite;
   return view;
 }
 
@@ -3529,14 +3462,16 @@ function clearToyHouseRoom() {
 
 function updateToyHouseRoomUi() {
   const room = toyHouseRooms[toyHouseRoomIndex];
+  const missingCount = toyHouseMissingOfficialAssetIds.length;
+  const missingSuffix = missingCount ? ` · 缺少官方素材 ${missingCount}` : "";
   if (toyHouseRoomTitleText) {
     toyHouseRoomTitleText.text = room ? room.name : "松松玩具屋";
   }
   if (toyHouseStatusText) {
     const total = toyHouseRooms.reduce((sum, item) => sum + item.ids.length, 0);
     toyHouseStatusText.text = room
-      ? `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · ${room.ids.length}/${total}`
-      : "还没有已解锁的松松";
+      ? `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · ${room.ids.length}/${total}${missingSuffix}`
+      : `没有可展示的官方松松素材${missingSuffix}`;
   }
   if (toyHousePrevButton) {
     setButtonStyle(toyHousePrevButton, {
@@ -3553,7 +3488,7 @@ function updateToyHouseRoomUi() {
 }
 
 function addToyHouseTsumEntry(entry, index, layout) {
-  if (!toyHouseEngine || !toyHouseRoomLayer) {
+  if (!toyHouseEngine || !toyHouseRoomLayer || !entry?.texture) {
     return;
   }
 
@@ -3636,6 +3571,7 @@ function destroyToyHouse() {
   toyHouseDecorLayer = null;
   toyHouseRoomStaticBodies = [];
   toyHouseRooms = [];
+  toyHouseMissingOfficialAssetIds = [];
   toyHouseRoomIndex = 0;
   toyHouseRoomRenderToken += 1;
   toyHouseRoomTitleText = null;
@@ -3691,29 +3627,29 @@ async function populateToyHouseRoom(roomIndex) {
   };
 
   if (toyHouseStatusText) {
-    toyHouseStatusText.text = `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · 正在放入 0/${count}`;
+    const missingSuffix = toyHouseMissingOfficialAssetIds.length ? ` · 缺少官方素材 ${toyHouseMissingOfficialAssetIds.length}` : "";
+    toyHouseStatusText.text = `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · 正在放入 0/${count}${missingSuffix}`;
   }
 
+  let placedCount = 0;
+  let loadFailureCount = 0;
   for (let start = 0; start < room.ids.length; start += TOY_HOUSE_ROOM_LOAD_BATCH_SIZE) {
     const batch = room.ids.slice(start, start + TOY_HOUSE_ROOM_LOAD_BATCH_SIZE);
-    const loaded = await Promise.all(batch.map((id) => (
-      loadToyHouseTsumTexture(id, catalogMap).catch(() => ({
-        id,
-        name: getToyHouseCatalogItem(id, catalogMap).name || `松松 ${id}`,
-        baseName: getToyHouseBaseName(getToyHouseCatalogItem(id, catalogMap)),
-        texture: getFallbackSpriteTexture(id),
-        isBucket: false,
-      }))
-    )));
+    const loaded = await Promise.all(batch.map((id) => loadToyHouseTsumTexture(id, catalogMap).catch(() => null)));
     if (token !== toyHouseRoomRenderToken || !toyHouseRoomLayer || !toyHouseEngine) {
       return;
     }
 
-    loaded.forEach((entry, batchIndex) => {
-      addToyHouseTsumEntry(entry, start + batchIndex, layout);
+    const officialEntries = loaded.filter(Boolean);
+    loadFailureCount += loaded.length - officialEntries.length;
+    officialEntries.forEach((entry) => {
+      addToyHouseTsumEntry(entry, placedCount, layout);
+      placedCount += 1;
     });
     if (toyHouseStatusText) {
-      toyHouseStatusText.text = `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · 正在放入 ${Math.min(start + loaded.length, count)}/${count}`;
+      const missingSuffix = toyHouseMissingOfficialAssetIds.length ? ` · 缺少官方素材 ${toyHouseMissingOfficialAssetIds.length}` : "";
+      const failedSuffix = loadFailureCount ? ` · 加载失败 ${loadFailureCount}` : "";
+      toyHouseStatusText.text = `房间 ${toyHouseRoomIndex + 1}/${toyHouseRooms.length} · 正在放入 ${placedCount}/${count}${missingSuffix}${failedSuffix}`;
     }
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
   }
@@ -4984,8 +4920,9 @@ function updateHeroUi() {
     return;
   }
 
-  if (heroSprite && selectedHeroTexture) {
-    heroSprite.texture = selectedHeroTexture;
+  const heroAvatarTexture = getHeroTexture(selectedHero);
+  if (heroSprite && heroAvatarTexture) {
+    heroSprite.texture = heroAvatarTexture;
     heroSprite.width = 64;
     heroSprite.height = 64;
   }
