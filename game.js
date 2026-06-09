@@ -24,7 +24,7 @@ const TOY_TOUCH_SOUND_PATH = "toy_touch.wav?v=1";
 const COLLECTION_CATALOG_PATH = "collection-catalog.json?v=3";
 const COLLECTION_CHARACTER_ASSET_PATH = "collection-character-assets.json?v=2";
 const TOY_HOUSE_BACKGROUND_PATH = "sszdy_assets/Texture2D_Texture2D_8066.png?v=60";
-const TOY_HOUSE_CAKE_PLATFORM_PATH = "sszdy_assets/Sprite_Sprite_68757.png?v=61";
+const TOY_HOUSE_CAKE_PLATFORM_PATH = "sszdy_assets/Texture2D_Texture2D_16837.png?v=64";
 const HUD_TOP = 54;
 const BOTTOM_SAFE_Y = DESIGN_HEIGHT - BALL_RADIUS - 118;
 const PROGRESS_STORAGE_KEY = "laohu-tsumtsum-level-progress-v1";
@@ -69,19 +69,20 @@ const VILLAIN_SPRITE_ID_SET = new Set(VILLAIN_SPRITE_IDS);
 const FRIENDLY_SPRITE_IDS = allSpriteIds().filter((id) => !VILLAIN_SPRITE_ID_SET.has(id));
 const FRIENDLY_SPRITE_ID_SET = new Set(FRIENDLY_SPRITE_IDS);
 const TOY_HOUSE_FLOOR_Y = 864;
-const TOY_HOUSE_BODY_WIDTH = 44;
-const TOY_HOUSE_BODY_HEIGHT = 42;
-const TOY_HOUSE_SPRITE_MAX_WIDTH = 56;
-const TOY_HOUSE_SPRITE_MAX_HEIGHT = 58;
+const TOY_HOUSE_BODY_WIDTH = 42;
+const TOY_HOUSE_BODY_HEIGHT = 44;
+const TOY_HOUSE_SPRITE_MAX_WIDTH = 64;
+const TOY_HOUSE_SPRITE_MAX_HEIGHT = 66;
 const TOY_HOUSE_FALLBACK_SPRITE_SIZE = 42;
 const TOY_HOUSE_CAKE_X = DESIGN_WIDTH / 2;
-const TOY_HOUSE_CAKE_Y = 744;
-const TOY_HOUSE_CAKE_WIDTH = 252;
-const TOY_HOUSE_CAKE_SURFACE_Y = 720;
-const TOY_HOUSE_CAKE_SURFACE_WIDTH = 206;
+const TOY_HOUSE_CAKE_Y = 616;
+const TOY_HOUSE_CAKE_WIDTH = 372;
+const TOY_HOUSE_CAKE_SURFACE_Y = 728;
+const TOY_HOUSE_CAKE_SURFACE_WIDTH = 276;
 const TOY_HOUSE_PLAY_TOP_Y = 190;
 const TOY_HOUSE_WALL_CATEGORY = 0x0001;
 const TOY_HOUSE_TOY_CATEGORY = 0x0002;
+const TOY_HOUSE_ROOM_STATIC_CATEGORY = 0x0004;
 
 const TOY_HOUSE_MODIFIER_PREFIXES = [
   "3rd Anniversary",
@@ -190,12 +191,14 @@ const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
   "finnick": "sszdy_assets/Sprite_Sprite_68544.png?v=61",
   "flash": "sszdy_assets/Sprite_Sprite_68534.png?v=61",
   "goofy": "sszdy_assets/Sprite_Sprite_68372.png?v=61",
+  "judy hopps": "sszdy_assets/Sprite_Sprite_68503.png?v=64",
   "kristoff": "sszdy_assets/Sprite_Sprite_68491.png?v=61",
   "lumiere": "sszdy_assets/Sprite_Sprite_68609.png?v=61",
   "mad hatter": "sszdy_assets/Sprite_Sprite_68334.png?v=61",
   "merida": "sszdy_assets/Sprite_Sprite_68718.png?v=61",
   "mickey mouse": "sszdy_assets/Sprite_Sprite_68322.png?v=61",
   "minnie mouse": "sszdy_assets/Sprite_Sprite_68435.png?v=61",
+  "mr big": "sszdy_assets/Sprite_Sprite_68566.png?v=64",
   "mrs potts": "sszdy_assets/Sprite_Sprite_68630.png?v=61",
   "nick wilde": "sszdy_assets/Sprite_Sprite_68516.png?v=61",
   "olaf": "sszdy_assets/Sprite_Sprite_68467.png?v=61",
@@ -204,9 +207,50 @@ const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
   "rabbit": "sszdy_assets/Sprite_Sprite_68403.png?v=61",
   "sven": "sszdy_assets/Sprite_Sprite_68476.png?v=61",
   "tigger": "sszdy_assets/Sprite_Sprite_68681.png?v=61",
+  "tumper": "sszdy_assets/Sprite_Sprite_68410.png?v=64",
   "white rabbit": "sszdy_assets/Sprite_Sprite_68359.png?v=61",
   "winnie the pooh": "sszdy_assets/Sprite_Sprite_68660.png?v=61",
 };
+
+const TOY_HOUSE_CAKE_PLATFORM_BY_ROOM = {
+  alice: "sszdy_assets/Texture2D_Texture2D_17128.png?v=64",
+  beauty: "sszdy_assets/Texture2D_Texture2D_17288.png?v=64",
+  frozen: "sszdy_assets/Texture2D_Texture2D_17196.png?v=64",
+  mickey: "sszdy_assets/Texture2D_Texture2D_16633.png?v=64",
+  pooh: "sszdy_assets/Texture2D_Texture2D_16984.png?v=64",
+  zootopia: "sszdy_assets/Texture2D_Texture2D_16837.png?v=64",
+};
+
+const TOY_HOUSE_DECOR_LIBRARY = {
+  buttonPink: "sszdy_assets/Sprite_Sprite_68774.png?v=64",
+  buttonTeal: "sszdy_assets/Texture2D_Texture2D_68783.png?v=64",
+  buttonYellow: "sszdy_assets/Texture2D_Texture2D_68778.png?v=64",
+  bunting: "sszdy_assets/Sprite_Sprite_68760.png?v=64",
+  clockBlue: "sszdy_assets/Sprite_Sprite_68818.png?v=64",
+  clockGold: "sszdy_assets/Sprite_Sprite_68808.png?v=64",
+  jewelTable: "sszdy_assets/Sprite_Sprite_68791.png?v=64",
+  mushroomCluster: "sszdy_assets/Sprite_Sprite_68803.png?v=64",
+  mushroomPink: "sszdy_assets/Sprite_Sprite_68795.png?v=64",
+  mushroomPurple: "sszdy_assets/Sprite_Sprite_68799.png?v=64",
+  pearlTable: "sszdy_assets/Sprite_Sprite_68775.png?v=64",
+  radioBlue: "sszdy_assets/Sprite_Sprite_68759.png?v=64",
+  radioRed: "sszdy_assets/Sprite_Sprite_68770.png?v=64",
+  radioYellow: "sszdy_assets/Sprite_Sprite_68772.png?v=64",
+  thread: "sszdy_assets/Sprite_Sprite_68786.png?v=64",
+  topHat: "sszdy_assets/Sprite_Sprite_68776.png?v=64",
+  trumpetGold: "sszdy_assets/Sprite_Sprite_68809.png?v=64",
+};
+
+const TOY_HOUSE_ROOM_DECOR_BY_KEY = {
+  alice: ["mushroomPink", "mushroomPurple", "mushroomCluster", "topHat", "jewelTable", "buttonPink"],
+  beauty: ["clockGold", "trumpetGold", "pearlTable", "buttonYellow", "thread"],
+  frozen: ["clockBlue", "pearlTable", "buttonTeal", "buttonYellow"],
+  mickey: ["bunting", "radioBlue", "radioRed", "buttonYellow", "buttonPink", "pearlTable"],
+  pooh: ["mushroomCluster", "mushroomPink", "buttonYellow", "thread"],
+  zootopia: ["radioBlue", "radioYellow", "bunting", "buttonTeal", "buttonYellow"],
+};
+
+const TOY_HOUSE_FALLBACK_DECOR_KEYS = ["buttonYellow", "buttonPink", "buttonTeal", "mushroomCluster", "pearlTable"];
 
 const TOY_HOUSE_ROOM_DEFINITIONS = [
   { key: "mickey", name: "米奇和朋友", aliases: ["Mickey Mouse", "Minnie Mouse", "Donald Duck", "Daisy Duck", "Goofy", "Pluto", "Chip", "Dale", "Pete", "Oswald the Lucky Rabbit"] },
@@ -662,8 +706,10 @@ let textureWarmupCursor = 0;
 let toyHouseContainer = null;
 let toyHouseEngine = null;
 let toyHouseRoomLayer = null;
+let toyHouseDecorLayer = null;
 let toyHouseTsums = [];
 let toyHouseEffects = [];
+let toyHouseRoomStaticBodies = [];
 let toyHouseRooms = [];
 let toyHouseRoomIndex = 0;
 let toyHouseRoomRenderToken = 0;
@@ -2737,6 +2783,10 @@ function getToyHouseBucketAssetPath(item) {
   return TOY_HOUSE_BUCKET_ASSETS_BY_BASE[normalizeTextKey(baseName)] || null;
 }
 
+function getToyHouseCakePlatformPath(room) {
+  return TOY_HOUSE_CAKE_PLATFORM_BY_ROOM[room?.key] || TOY_HOUSE_CAKE_PLATFORM_PATH;
+}
+
 function getToyHouseCatalogItem(id, catalogMap) {
   return catalogMap?.get(id) || {
     id,
@@ -2779,13 +2829,15 @@ function buildToyHouseRooms(unlockedIds, catalogMap) {
 async function loadToyHouseTsumTexture(id, catalogMap) {
   const item = getToyHouseCatalogItem(id, catalogMap);
   const bucketPath = getToyHouseBucketAssetPath(item);
+  const name = item.name || `松松 ${id}`;
+  const baseName = getToyHouseBaseName(item);
   if (bucketPath) {
     const texture = await loadPixiTextureWithFallback(bucketPath, getFallbackSpriteTexture(id));
-    return { id, texture, isBucket: true };
+    return { id, name, baseName, texture, isBucket: true };
   }
 
   const texture = await loadSpriteTextureWithFallback(id);
-  return { id, texture, isBucket: false };
+  return { id, name, baseName, texture, isBucket: false };
 }
 
 function fitToyHouseSprite(sprite, maxWidth, maxHeight) {
@@ -2824,68 +2876,50 @@ function addToyHouseStaticRect(x, y, width, height, options = {}) {
 
   const body = Bodies.rectangle(x + width / 2, y + height / 2, width, height, bodyOptions);
   Composite.add(toyHouseEngine.world, body);
+  if (options.roomStatic) {
+    toyHouseRoomStaticBodies.push(body);
+  }
   return body;
 }
 
-function drawToyHouseFurniture(container, cakeTexture) {
+function clearToyHouseRoomDecor() {
+  if (toyHouseEngine) {
+    for (const body of toyHouseRoomStaticBodies) {
+      Composite.remove(toyHouseEngine.world, body);
+    }
+  }
+  toyHouseRoomStaticBodies = [];
+  if (toyHouseDecorLayer) {
+    toyHouseDecorLayer.removeChildren().forEach((child) => child.destroy({ children: true }));
+  }
+}
+
+function drawToyHouseBaseFurniture(container) {
   const furniture = new PIXI.Graphics();
 
-  furniture.beginFill(0x7f5a44, 0.82);
-  furniture.drawRoundedRect(36, 214, 162, 18, 8);
+  furniture.beginFill(0x7f5a44, 0.78);
+  furniture.drawRoundedRect(34, 218, 162, 18, 8);
+  furniture.drawRoundedRect(250, 246, 136, 16, 8);
   furniture.endFill();
   furniture.beginFill(0xffd778, 0.92);
   for (let i = 0; i < 8; i += 1) {
     furniture.drawRoundedRect(52 + i * 17, 172 + (i % 3) * 6, 12, 42 - (i % 2) * 8, 4);
   }
   furniture.endFill();
+  furniture.beginFill(0xbdeff8, 0.82);
+  for (let i = 0; i < 5; i += 1) {
+    furniture.drawCircle(276 + i * 22, 226 + (i % 2) * 8, 8);
+  }
+  furniture.endFill();
 
-  furniture.beginFill(0xffffff, 0.16);
-  furniture.drawEllipse(DESIGN_WIDTH / 2, TOY_HOUSE_FLOOR_Y + 3, 188, 34);
+  furniture.beginFill(0xffffff, 0.18);
+  furniture.drawEllipse(DESIGN_WIDTH / 2, TOY_HOUSE_FLOOR_Y + 3, 196, 34);
+  furniture.beginFill(0xffe8ad, 0.12);
+  furniture.drawEllipse(DESIGN_WIDTH / 2, TOY_HOUSE_FLOOR_Y - 38, 154, 24);
   furniture.endFill();
 
   furniture.zIndex = 2;
   container.addChild(furniture);
-
-  if (cakeTexture) {
-    const cake = new PIXI.Sprite(cakeTexture);
-    cake.anchor.set(0.5);
-    const cakeScale = TOY_HOUSE_CAKE_WIDTH / (cake.texture.width || TOY_HOUSE_CAKE_WIDTH);
-    cake.scale.set(cakeScale);
-    cake.position.set(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y);
-    cake.zIndex = 9;
-    container.addChild(cake);
-    addToyHouseStaticRect(
-      TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2,
-      TOY_HOUSE_CAKE_SURFACE_Y,
-      TOY_HOUSE_CAKE_SURFACE_WIDTH,
-      18,
-      { restitution: 0.02, friction: 0.92, frictionStatic: 0.94 },
-    );
-    addToyHouseStaticRect(
-      TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.36,
-      TOY_HOUSE_CAKE_SURFACE_Y + 30,
-      TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.72,
-      18,
-      { restitution: 0.02, friction: 0.94, frictionStatic: 0.96 },
-    );
-  } else {
-    const cake = new PIXI.Graphics();
-    cake.beginFill(0xffa63a, 0.92);
-    cake.drawEllipse(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y, TOY_HOUSE_CAKE_WIDTH / 2, 44);
-    cake.endFill();
-    cake.beginFill(0xffc45a, 0.94);
-    cake.drawEllipse(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y - 16, TOY_HOUSE_CAKE_WIDTH * 0.42, 32);
-    cake.endFill();
-    cake.zIndex = 9;
-    container.addChild(cake);
-    addToyHouseStaticRect(
-      TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2,
-      TOY_HOUSE_CAKE_SURFACE_Y,
-      TOY_HOUSE_CAKE_SURFACE_WIDTH,
-      18,
-      { restitution: 0.02, friction: 0.92, frictionStatic: 0.94 },
-    );
-  }
 
   addToyHouseStaticRect(0, TOY_HOUSE_FLOOR_Y, DESIGN_WIDTH, 86, {
     restitution: 0.02,
@@ -2901,6 +2935,116 @@ function drawToyHouseFurniture(container, cakeTexture) {
   addToyHouseStaticRect(DESIGN_WIDTH - 14, 110, 92, 864, { restitution: 0.03, friction: 0.9, frictionStatic: 0.94 });
 }
 
+function addToyHouseCakeCollision() {
+  const collisionFilter = {
+    category: TOY_HOUSE_ROOM_STATIC_CATEGORY,
+    mask: TOY_HOUSE_TOY_CATEGORY,
+  };
+  addToyHouseStaticRect(
+    TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2,
+    TOY_HOUSE_CAKE_SURFACE_Y,
+    TOY_HOUSE_CAKE_SURFACE_WIDTH,
+    18,
+    { restitution: 0.01, friction: 1, frictionStatic: 1.04, collisionFilter, roomStatic: true },
+  );
+  addToyHouseStaticRect(
+    TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.42,
+    TOY_HOUSE_CAKE_SURFACE_Y - 66,
+    TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.32,
+    16,
+    { restitution: 0.01, friction: 0.96, frictionStatic: 1, collisionFilter, roomStatic: true },
+  );
+  addToyHouseStaticRect(
+    TOY_HOUSE_CAKE_X + TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.12,
+    TOY_HOUSE_CAKE_SURFACE_Y - 48,
+    TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.28,
+    16,
+    { restitution: 0.01, friction: 0.96, frictionStatic: 1, collisionFilter, roomStatic: true },
+  );
+}
+
+function drawToyHouseFallbackCake() {
+  if (!toyHouseDecorLayer) {
+    return;
+  }
+
+  const cake = new PIXI.Graphics();
+  cake.beginFill(0xffa63a, 0.92);
+  cake.drawEllipse(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_SURFACE_Y + 24, TOY_HOUSE_CAKE_WIDTH / 2, 46);
+  cake.endFill();
+  cake.beginFill(0xfff0bb, 0.96);
+  cake.drawEllipse(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_SURFACE_Y, TOY_HOUSE_CAKE_SURFACE_WIDTH / 2, 34);
+  cake.endFill();
+  cake.zIndex = 8;
+  toyHouseDecorLayer.addChild(cake);
+  addToyHouseCakeCollision();
+}
+
+function getToyHouseDecorKeys(room) {
+  return TOY_HOUSE_ROOM_DECOR_BY_KEY[room?.key] || TOY_HOUSE_FALLBACK_DECOR_KEYS;
+}
+
+async function addToyHouseDecorSprite(key, index, token) {
+  if (!toyHouseDecorLayer) {
+    return;
+  }
+
+  const path = TOY_HOUSE_DECOR_LIBRARY[key];
+  if (!path) {
+    return;
+  }
+
+  const texture = await loadPixiTextureWithFallback(path, null);
+  if (token !== toyHouseRoomRenderToken || !toyHouseDecorLayer || !texture) {
+    return;
+  }
+
+  const spots = [
+    { x: 56, y: 632, width: 78, rotation: -0.06, zIndex: 7 },
+    { x: 372, y: 642, width: 80, rotation: 0.05, zIndex: 7 },
+    { x: 72, y: 404, width: 72, rotation: 0.04, zIndex: 5 },
+    { x: 356, y: 428, width: 76, rotation: -0.05, zIndex: 5 },
+    { x: 112, y: 770, width: 62, rotation: 0.08, zIndex: 10 },
+    { x: 326, y: 786, width: 66, rotation: -0.08, zIndex: 10 },
+  ];
+  const spot = spots[index % spots.length];
+  const sprite = new PIXI.Sprite(texture);
+  sprite.anchor.set(0.5);
+  sprite.position.set(spot.x, spot.y);
+  sprite.rotation = spot.rotation;
+  sprite.zIndex = spot.zIndex;
+  const scale = spot.width / (sprite.texture.width || spot.width);
+  sprite.scale.set(scale);
+  toyHouseDecorLayer.addChild(sprite);
+}
+
+async function drawToyHouseRoomDecor(room, token) {
+  clearToyHouseRoomDecor();
+  if (!toyHouseDecorLayer) {
+    return;
+  }
+
+  const cakeTexture = await loadPixiTextureWithFallback(getToyHouseCakePlatformPath(room), null);
+  if (token !== toyHouseRoomRenderToken || !toyHouseDecorLayer) {
+    return;
+  }
+
+  if (cakeTexture) {
+    const cake = new PIXI.Sprite(cakeTexture);
+    cake.anchor.set(0.5);
+    const cakeScale = TOY_HOUSE_CAKE_WIDTH / (cake.texture.width || TOY_HOUSE_CAKE_WIDTH);
+    cake.scale.set(cakeScale);
+    cake.position.set(TOY_HOUSE_CAKE_X, TOY_HOUSE_CAKE_Y);
+    cake.zIndex = 8;
+    toyHouseDecorLayer.addChild(cake);
+    addToyHouseCakeCollision();
+  } else {
+    drawToyHouseFallbackCake();
+  }
+
+  await Promise.all(getToyHouseDecorKeys(room).map((key, index) => addToyHouseDecorSprite(key, index, token)));
+}
+
 function makeToyHouseTsumView(texture, isBucket) {
   const view = new PIXI.Container();
   const shadow = new PIXI.Graphics();
@@ -2911,11 +3055,13 @@ function makeToyHouseTsumView(texture, isBucket) {
 
   if (!isBucket) {
     const body = new PIXI.Graphics();
-    body.beginFill(0xf7c65a, 0.78);
-    body.drawRoundedRect(-20, -2, 40, 32, 14);
+    body.beginFill(0xf7c65a, 0.9);
+    body.drawRoundedRect(-22, -6, 44, 36, 15);
+    body.beginFill(0xffdd84, 0.94);
+    body.drawEllipse(0, -6, 22, 9);
     body.endFill();
-    body.lineStyle(2, 0xffffff, 0.22);
-    body.drawRoundedRect(-20, -2, 40, 32, 14);
+    body.lineStyle(2, 0xffffff, 0.26);
+    body.drawRoundedRect(-22, -6, 44, 36, 15);
     view.addChild(body);
   }
 
@@ -2926,27 +3072,44 @@ function makeToyHouseTsumView(texture, isBucket) {
     isBucket ? TOY_HOUSE_SPRITE_MAX_WIDTH : TOY_HOUSE_FALLBACK_SPRITE_SIZE,
     isBucket ? TOY_HOUSE_SPRITE_MAX_HEIGHT : TOY_HOUSE_FALLBACK_SPRITE_SIZE,
   );
-  sprite.position.set(0, isBucket ? -8 : -12);
+  sprite.position.set(0, isBucket ? -8 : -16);
   view.addChild(sprite);
   view._toySprite = sprite;
   return view;
 }
 
-function createToyHouseHeartBubble(x, y) {
+function createToyHouseHeartBubble(x, y, label = "") {
   if (!toyHouseContainer) {
     return;
   }
 
   const bubble = new PIXI.Container();
   const bg = new PIXI.Graphics();
+  const bubbleWidth = label ? clamp(label.length * 8 + 38, 64, 156) : 56;
   bg.beginFill(0xffffff, 0.88);
-  bg.drawRoundedRect(-28, -24, 56, 42, 18);
+  bg.drawRoundedRect(-bubbleWidth / 2, -24, bubbleWidth, 42, 18);
   bg.endFill();
   bg.lineStyle(3, 0xff91b8, 0.72);
-  bg.drawRoundedRect(-28, -24, 56, 42, 18);
-  drawHeartShape(bg, -7, -4, 18, 0xff5f8f, 0.96);
-  drawHeartShape(bg, 12, -9, 12, 0xff9fcb, 0.9);
+  bg.drawRoundedRect(-bubbleWidth / 2, -24, bubbleWidth, 42, 18);
+  drawHeartShape(bg, label ? -bubbleWidth / 2 + 18 : -7, -4, 18, 0xff5f8f, 0.96);
+  drawHeartShape(bg, label ? -bubbleWidth / 2 + 34 : 12, -9, 12, 0xff9fcb, 0.9);
   bubble.addChild(bg);
+  if (label) {
+    const text = new PIXI.Text(label, {
+      fill: 0x8a3154,
+      fontFamily: "Arial, Microsoft YaHei, sans-serif",
+      fontSize: 11,
+      fontWeight: "900",
+      stroke: 0xffffff,
+      strokeThickness: 2,
+      wordWrap: true,
+      wordWrapWidth: bubbleWidth - 46,
+      align: "center",
+    });
+    text.anchor.set(0.5);
+    text.position.set(16, -5);
+    bubble.addChild(text);
+  }
   bubble.position.set(x, y - 58);
   bubble.zIndex = 18;
   toyHouseContainer.addChild(bubble);
@@ -2985,7 +3148,7 @@ function startToyHouseDrag(toy, event) {
     x: clamp(point.x + toyHouseDrag.offsetX, 28, DESIGN_WIDTH - 28),
     y: clamp(point.y + toyHouseDrag.offsetY - 30, TOY_HOUSE_PLAY_TOP_Y, TOY_HOUSE_FLOOR_Y - bodyHeight / 2 - 4),
   });
-  createToyHouseHeartBubble(toy.body.position.x, toy.body.position.y);
+  createToyHouseHeartBubble(toy.body.position.x, toy.body.position.y, toy.name || "");
   triggerHaptic(28);
 }
 
@@ -3011,6 +3174,60 @@ function dragToyHouseTsum(event) {
   Body.setVelocity(toyHouseDrag.toy.body, { x: 0, y: 0 });
 }
 
+function getToyHouseStackSupport(toy) {
+  const bodyHeight = toy.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
+  const bodyWidth = toy.bodyWidth || TOY_HOUSE_BODY_WIDTH;
+  const toyBottom = toy.body.position.y + bodyHeight / 2;
+  let bestSupport = null;
+  let bestDistance = Infinity;
+
+  for (const other of toyHouseTsums) {
+    if (other === toy || other.isDragged) {
+      continue;
+    }
+    const otherHeight = other.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
+    const otherWidth = other.bodyWidth || TOY_HOUSE_BODY_WIDTH;
+    const otherTop = other.body.position.y - otherHeight / 2;
+    const horizontalLimit = (bodyWidth + otherWidth) * 0.48;
+    const horizontalDistance = Math.abs(toy.body.position.x - other.body.position.x);
+    const verticalDistance = Math.abs(toyBottom - otherTop);
+    if (
+      horizontalDistance <= horizontalLimit
+      && toy.body.position.y < other.body.position.y
+      && toyBottom >= otherTop - 30
+      && toyBottom <= otherTop + 48
+      && verticalDistance < bestDistance
+    ) {
+      bestSupport = other;
+      bestDistance = verticalDistance;
+    }
+  }
+
+  return bestSupport;
+}
+
+function settleToyHouseStackPlacement(toy) {
+  const support = getToyHouseStackSupport(toy);
+  if (!support) {
+    return false;
+  }
+
+  const bodyHeight = toy.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
+  const bodyWidth = toy.bodyWidth || TOY_HOUSE_BODY_WIDTH;
+  const supportHeight = support.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
+  const supportWidth = support.bodyWidth || TOY_HOUSE_BODY_WIDTH;
+  const offsetX = clamp(toy.body.position.x - support.body.position.x, -supportWidth * 0.18, supportWidth * 0.18);
+  const x = clamp(support.body.position.x + offsetX, 24 + bodyWidth / 2, DESIGN_WIDTH - 24 - bodyWidth / 2);
+  const y = support.body.position.y - supportHeight / 2 - bodyHeight / 2 + 1;
+
+  Body.setPosition(toy.body, { x, y });
+  Body.setAngle(toy.body, clamp(toy.body.angle * 0.16, -0.08, 0.08));
+  toy.homeX = x;
+  toy.targetX = x;
+  toy.manualUntil = performance.now() + 1600;
+  return true;
+}
+
 function releaseToyHouseDrag(event) {
   if (!toyHouseDrag || !toyHouseDrag.toy) {
     return;
@@ -3027,12 +3244,13 @@ function releaseToyHouseDrag(event) {
   toy.isDragged = false;
   toy.isPlaced = true;
   toy.manualUntil = performance.now() + 700;
+  const snappedToStack = settleToyHouseStackPlacement(toy);
   Body.setStatic(toy.body, false);
   Body.setVelocity(toy.body, {
-    x: flingX,
-    y: Math.max(toy.body.velocity.y, 0.15),
+    x: snappedToStack ? 0 : flingX * 0.35,
+    y: snappedToStack ? 0.04 : Math.max(toy.body.velocity.y, 0.12),
   });
-  Body.setAngularVelocity(toy.body, clamp(flingX * 0.025, -0.06, 0.06));
+  Body.setAngularVelocity(toy.body, snappedToStack ? 0 : clamp(flingX * 0.012, -0.035, 0.035));
 }
 
 function updateToyHouseEffects() {
@@ -3104,7 +3322,8 @@ function updateToyHouse(now, delta) {
       && Math.abs(toy.body.position.x - TOY_HOUSE_CAKE_X) < TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.54
     );
     const onFloor = toy.body.position.y >= TOY_HOUSE_FLOOR_Y - bodyHeight / 2 - 10;
-    const grounded = (onFloor || onCake) && Math.abs(toy.body.velocity.y) < 1.25;
+    const onToyStack = Boolean(getToyHouseStackSupport(toy));
+    const grounded = (onFloor || onCake || onToyStack) && Math.abs(toy.body.velocity.y) < 1.25;
 
     if (toy.isPlaced) {
       if (grounded || Math.abs(toy.body.velocity.x) > 0.05 || Math.abs(toy.body.angularVelocity) > 0.01) {
@@ -3246,16 +3465,16 @@ function addToyHouseTsumEntry(entry, index, layout) {
     bodyWidth,
     bodyHeight,
     {
-      restitution: 0.035,
-      friction: 0.78,
-      frictionStatic: 0.94,
-      frictionAir: 0.032,
-      density: 0.00165,
-      slop: 0.035,
-      chamfer: { radius: 12 },
+      restitution: 0.005,
+      friction: 0.98,
+      frictionStatic: 1.08,
+      frictionAir: 0.052,
+      density: 0.002,
+      slop: 0.012,
+      chamfer: { radius: 9 },
       collisionFilter: {
         category: TOY_HOUSE_TOY_CATEGORY,
-        mask: TOY_HOUSE_WALL_CATEGORY | TOY_HOUSE_TOY_CATEGORY,
+        mask: TOY_HOUSE_WALL_CATEGORY | TOY_HOUSE_TOY_CATEGORY | TOY_HOUSE_ROOM_STATIC_CATEGORY,
       },
     },
   );
@@ -3277,6 +3496,9 @@ function addToyHouseTsumEntry(entry, index, layout) {
     bodyHeight,
     view,
     spriteId: entry.id,
+    name: entry.name,
+    baseName: entry.baseName,
+    isBucket: entry.isBucket,
     direction: Math.random() < 0.5 ? -1 : 1,
     homeX: clamp(homeX, 34, DESIGN_WIDTH - 34),
     targetX: clamp(x + (Math.random() - 0.5) * 48, 34, DESIGN_WIDTH - 34),
@@ -3296,12 +3518,15 @@ function addToyHouseTsumEntry(entry, index, layout) {
 
 function destroyToyHouse() {
   clearToyHouseRoom();
+  clearToyHouseRoomDecor();
   if (toyHouseContainer) {
     toyHouseContainer.destroy({ children: true });
     toyHouseContainer = null;
   }
   toyHouseEngine = null;
   toyHouseRoomLayer = null;
+  toyHouseDecorLayer = null;
+  toyHouseRoomStaticBodies = [];
   toyHouseRooms = [];
   toyHouseRoomIndex = 0;
   toyHouseRoomRenderToken += 1;
@@ -3333,6 +3558,10 @@ async function populateToyHouseRoom(roomIndex) {
   const token = toyHouseRoomRenderToken;
   clearToyHouseRoom();
   updateToyHouseRoomUi();
+  await drawToyHouseRoomDecor(room, token);
+  if (token !== toyHouseRoomRenderToken || !toyHouseRoomLayer || !toyHouseEngine) {
+    return;
+  }
 
   const catalogMap = await loadCollectionCatalog();
   if (token !== toyHouseRoomRenderToken || !toyHouseRoomLayer || !toyHouseEngine) {
@@ -3362,6 +3591,8 @@ async function populateToyHouseRoom(roomIndex) {
     const loaded = await Promise.all(batch.map((id) => (
       loadToyHouseTsumTexture(id, catalogMap).catch(() => ({
         id,
+        name: getToyHouseCatalogItem(id, catalogMap).name || `松松 ${id}`,
+        baseName: getToyHouseBaseName(getToyHouseCatalogItem(id, catalogMap)),
         texture: getFallbackSpriteTexture(id),
         isBucket: false,
       }))
@@ -3433,9 +3664,8 @@ async function showToyHouse() {
   });
 
   try {
-    const [backgroundTexture, cakeTexture, catalogMap] = await Promise.all([
+    const [backgroundTexture, catalogMap] = await Promise.all([
       loadPixiTextureWithFallback(TOY_HOUSE_BACKGROUND_PATH),
-      loadPixiTextureWithFallback(TOY_HOUSE_CAKE_PLATFORM_PATH, null).catch(() => null),
       loadCollectionCatalog(),
     ]);
     const bg = new PIXI.Sprite(backgroundTexture);
@@ -3450,7 +3680,12 @@ async function showToyHouse() {
     shade.zIndex = 1;
     toyHouseContainer.addChild(shade);
 
-    drawToyHouseFurniture(toyHouseContainer, cakeTexture);
+    drawToyHouseBaseFurniture(toyHouseContainer);
+
+    toyHouseDecorLayer = new PIXI.Container();
+    toyHouseDecorLayer.zIndex = 8;
+    toyHouseDecorLayer.sortableChildren = true;
+    toyHouseContainer.addChild(toyHouseDecorLayer);
 
     toyHouseRoomLayer = new PIXI.Container();
     toyHouseRoomLayer.zIndex = 12;
