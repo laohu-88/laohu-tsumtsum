@@ -80,9 +80,20 @@ const TOY_HOUSE_CAKE_WIDTH = 372;
 const TOY_HOUSE_CAKE_SURFACE_Y = 728;
 const TOY_HOUSE_CAKE_SURFACE_WIDTH = 276;
 const TOY_HOUSE_PLAY_TOP_Y = 190;
+const TOY_HOUSE_MAX_BODY_ANGLE = 0.18;
+const TOY_HOUSE_MAX_VIEW_ROTATION = 0.06;
 const TOY_HOUSE_WALL_CATEGORY = 0x0001;
 const TOY_HOUSE_TOY_CATEGORY = 0x0002;
 const TOY_HOUSE_ROOM_STATIC_CATEGORY = 0x0004;
+
+const TOY_HOUSE_PLATFORM_SURFACES = [
+  { x: 154, y: 308, width: 98, height: 16 },
+  { x: 55, y: 436, width: 116, height: 16 },
+  { x: 160, y: 464, width: 214, height: 18 },
+  { x: 52, y: 612, width: 150, height: 16 },
+  { x: 260, y: 646, width: 116, height: 16 },
+  { x: TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2, y: TOY_HOUSE_CAKE_SURFACE_Y, width: TOY_HOUSE_CAKE_SURFACE_WIDTH, height: 18 },
+];
 
 const TOY_HOUSE_MODIFIER_PREFIXES = [
   "3rd Anniversary",
@@ -178,9 +189,11 @@ const TOY_HOUSE_BASE_NAME_ALIASES = {
 
 const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
   "alice": "sszdy_assets/Sprite_Sprite_68736.png?v=61",
+  "angel": "sszdy_assets/Sprite_Sprite_72039.png?v=64",
   "anna": "sszdy_assets/Sprite_Sprite_68456.png?v=61",
   "beast": "sszdy_assets/Sprite_Sprite_68586.png?v=61",
   "belle": "sszdy_assets/Sprite_Sprite_68604.png?v=61",
+  "captain gantu": "sszdy_assets/Sprite_Sprite_72043.png?v=64",
   "cheshire cat": "sszdy_assets/Sprite_Sprite_68348.png?v=61",
   "clawhauser": "sszdy_assets/Sprite_Sprite_68556.png?v=61",
   "cogsworth": "sszdy_assets/Sprite_Sprite_68629.png?v=61",
@@ -191,9 +204,13 @@ const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
   "elsa": "sszdy_assets/Sprite_Sprite_68448.png?v=61",
   "finnick": "sszdy_assets/Sprite_Sprite_68544.png?v=61",
   "flash": "sszdy_assets/Sprite_Sprite_68534.png?v=61",
+  "friend owl": "sszdy_assets/Sprite_Sprite_72022.png?v=64",
   "goofy": "sszdy_assets/Sprite_Sprite_68372.png?v=61",
+  "hound": "sszdy_assets/Sprite_Sprite_71991.png?v=64",
   "judy hopps": "sszdy_assets/Sprite_Sprite_68503.png?v=64",
+  "jumba": "sszdy_assets/Sprite_Sprite_72024.png?v=64",
   "kristoff": "sszdy_assets/Sprite_Sprite_68491.png?v=61",
+  "lilo pelekai": "sszdy_assets/Sprite_Sprite_72034.png?v=64",
   "lumiere": "sszdy_assets/Sprite_Sprite_68609.png?v=61",
   "mad hatter": "sszdy_assets/Sprite_Sprite_68334.png?v=61",
   "merida": "sszdy_assets/Sprite_Sprite_68718.png?v=61",
@@ -206,9 +223,14 @@ const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
   "piglet": "sszdy_assets/Sprite_Sprite_68663.png?v=61",
   "pluto": "sszdy_assets/Sprite_Sprite_68379.png?v=61",
   "rabbit": "sszdy_assets/Sprite_Sprite_68403.png?v=61",
+  "roo": "sszdy_assets/Sprite_Sprite_71995.png?v=64",
+  "scrump": "sszdy_assets/Sprite_Sprite_72037.png?v=64",
+  "snow white": "sszdy_assets/Sprite_Sprite_72544.png?v=64",
+  "stitch": "sszdy_assets/Sprite_Sprite_72031.png?v=64",
   "sven": "sszdy_assets/Sprite_Sprite_68476.png?v=61",
   "tigger": "sszdy_assets/Sprite_Sprite_68681.png?v=61",
   "tumper": "sszdy_assets/Sprite_Sprite_68410.png?v=64",
+  "ugly duckling": "sszdy_assets/Sprite_Sprite_72026.png?v=64",
   "white rabbit": "sszdy_assets/Sprite_Sprite_68359.png?v=61",
   "winnie the pooh": "sszdy_assets/Sprite_Sprite_68660.png?v=61",
 };
@@ -356,7 +378,6 @@ const HEROES = [
     id: "goofy",
     name: "高飞",
     assetId: 197,
-    avatarPath: "sszdy_assets/Sprite_Sprite_68372.png?v=67",
     skillName: "高飞竖线",
     skill: "vertical",
     description: "滑动选择一列，释放纵向清除",
@@ -2967,27 +2988,55 @@ function addToyHouseCakeCollision() {
     category: TOY_HOUSE_ROOM_STATIC_CATEGORY,
     mask: TOY_HOUSE_TOY_CATEGORY,
   };
-  addToyHouseStaticRect(
-    TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH / 2,
-    TOY_HOUSE_CAKE_SURFACE_Y,
-    TOY_HOUSE_CAKE_SURFACE_WIDTH,
-    18,
-    { restitution: 0.01, friction: 1, frictionStatic: 1.04, collisionFilter, roomStatic: true },
-  );
-  addToyHouseStaticRect(
-    TOY_HOUSE_CAKE_X - TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.42,
-    TOY_HOUSE_CAKE_SURFACE_Y - 66,
-    TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.32,
-    16,
-    { restitution: 0.01, friction: 0.96, frictionStatic: 1, collisionFilter, roomStatic: true },
-  );
-  addToyHouseStaticRect(
-    TOY_HOUSE_CAKE_X + TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.12,
-    TOY_HOUSE_CAKE_SURFACE_Y - 48,
-    TOY_HOUSE_CAKE_SURFACE_WIDTH * 0.28,
-    16,
-    { restitution: 0.01, friction: 0.96, frictionStatic: 1, collisionFilter, roomStatic: true },
-  );
+  for (const surface of TOY_HOUSE_PLATFORM_SURFACES) {
+    addToyHouseStaticRect(
+      surface.x,
+      surface.y,
+      surface.width,
+      surface.height,
+      { restitution: 0.01, friction: 1, frictionStatic: 1.04, collisionFilter, roomStatic: true },
+    );
+  }
+}
+
+function getToyHouseSurfaceSnap(toy) {
+  const bodyHeight = toy.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
+  const bodyWidth = toy.bodyWidth || TOY_HOUSE_BODY_WIDTH;
+  const toyBottom = toy.body.position.y + bodyHeight / 2;
+  let bestSurface = null;
+  let bestDistance = Infinity;
+
+  for (const surface of TOY_HOUSE_PLATFORM_SURFACES) {
+    const withinX = toy.body.position.x >= surface.x - bodyWidth * 0.18
+      && toy.body.position.x <= surface.x + surface.width + bodyWidth * 0.18;
+    const distance = Math.abs(toyBottom - surface.y);
+    if (withinX && toyBottom >= surface.y - 42 && toyBottom <= surface.y + 70 && distance < bestDistance) {
+      bestSurface = surface;
+      bestDistance = distance;
+    }
+  }
+
+  return bestSurface;
+}
+
+function isToyHouseOnPlatform(toy) {
+  return Boolean(getToyHouseSurfaceSnap(toy));
+}
+
+function stabilizeToyHouseTsum(toy, grounded = false) {
+  const angleLimit = grounded ? TOY_HOUSE_MAX_BODY_ANGLE * 0.48 : TOY_HOUSE_MAX_BODY_ANGLE;
+  if (Math.abs(toy.body.angle) > angleLimit) {
+    Body.setAngle(toy.body, clamp(toy.body.angle, -angleLimit, angleLimit));
+  }
+  if (Math.abs(toy.body.angularVelocity) > 0.002) {
+    Body.setAngularVelocity(toy.body, toy.body.angularVelocity * (grounded ? 0.62 : 0.78));
+  }
+}
+
+function syncToyHouseTsumView(toy, rotationFactor, grounded = false) {
+  stabilizeToyHouseTsum(toy, grounded);
+  toy.view.position.set(toy.body.position.x, toy.body.position.y);
+  toy.view.rotation = clamp(toy.body.angle * rotationFactor, -TOY_HOUSE_MAX_VIEW_ROTATION, TOY_HOUSE_MAX_VIEW_ROTATION);
 }
 
 function drawToyHouseFallbackCake() {
@@ -3159,6 +3208,7 @@ function startToyHouseDrag(toy, event) {
   toy.view.zIndex = 40;
   Body.setVelocity(toy.body, { x: 0, y: 0 });
   Body.setAngularVelocity(toy.body, 0);
+  Body.setAngle(toy.body, 0);
   Body.setStatic(toy.body, true);
   Body.setPosition(toy.body, {
     x: clamp(point.x + toyHouseDrag.offsetX, 28, DESIGN_WIDTH - 28),
@@ -3188,6 +3238,8 @@ function dragToyHouseTsum(event) {
   toyHouseDrag.lastAt = now;
   Body.setPosition(toyHouseDrag.toy.body, { x: nextX, y: nextY });
   Body.setVelocity(toyHouseDrag.toy.body, { x: 0, y: 0 });
+  Body.setAngularVelocity(toyHouseDrag.toy.body, 0);
+  Body.setAngle(toyHouseDrag.toy.body, 0);
 }
 
 function getToyHouseStackSupport(toy) {
@@ -3244,7 +3296,7 @@ function settleToyHouseStackPlacement(toy) {
   Body.setVelocity(support.body, { x: 0, y: 0 });
   Body.setAngularVelocity(support.body, 0);
   Body.setPosition(toy.body, { x, y });
-  Body.setAngle(toy.body, clamp(toy.body.angle * 0.16, -0.08, 0.08));
+  Body.setAngle(toy.body, 0);
   toy.homeX = x;
   toy.targetX = x;
   toy.manualUntil = now + 2200;
@@ -3270,12 +3322,24 @@ function releaseToyHouseDrag(event) {
   toy.isPlaced = true;
   toy.manualUntil = performance.now() + 700;
   const snappedToStack = settleToyHouseStackPlacement(toy);
+  const snappedToSurface = !snappedToStack ? getToyHouseSurfaceSnap(toy) : null;
+  if (snappedToSurface) {
+    const bodyHeight = toy.bodyHeight || TOY_HOUSE_BODY_HEIGHT;
+    Body.setPosition(toy.body, {
+      x: clamp(toy.body.position.x, snappedToSurface.x + 8, snappedToSurface.x + snappedToSurface.width - 8),
+      y: snappedToSurface.y - bodyHeight / 2 + 1,
+    });
+    toy.homeX = toy.body.position.x;
+    toy.targetX = toy.body.position.x;
+    toy.manualUntil = performance.now() + 1500;
+  }
   Body.setStatic(toy.body, snappedToStack);
   Body.setVelocity(toy.body, {
-    x: snappedToStack ? 0 : flingX * 0.35,
-    y: snappedToStack ? 0 : Math.max(toy.body.velocity.y, 0.12),
+    x: snappedToStack || snappedToSurface ? 0 : flingX * 0.35,
+    y: snappedToStack || snappedToSurface ? 0 : Math.max(toy.body.velocity.y, 0.12),
   });
-  Body.setAngularVelocity(toy.body, snappedToStack ? 0 : clamp(flingX * 0.012, -0.035, 0.035));
+  Body.setAngularVelocity(toy.body, 0);
+  Body.setAngle(toy.body, 0);
   if (!snappedToStack) {
     toy.isStackLocked = false;
     toy.stackSupportId = null;
@@ -3309,6 +3373,7 @@ function resetEscapedToyHouseTsum(toy, now) {
     y: 0.2,
   });
   Body.setAngularVelocity(toy.body, 0);
+  Body.setAngle(toy.body, 0);
   toy.isPlaced = true;
   toy.isStackLocked = false;
   toy.stackSupportId = null;
@@ -3341,14 +3406,12 @@ function updateToyHouse(now, delta) {
     }
 
     if (toy.isDragged) {
-      toy.view.position.set(toy.body.position.x, toy.body.position.y);
-      toy.view.rotation = toy.body.angle * 0.18;
+      syncToyHouseTsumView(toy, 0.12, false);
       continue;
     }
 
     if (toy.isStackLocked) {
-      toy.view.position.set(toy.body.position.x, toy.body.position.y);
-      toy.view.rotation = toy.body.angle * 0.12;
+      syncToyHouseTsumView(toy, 0.12, true);
       toy.view.zIndex = 13 + toy.body.position.y / 1000;
       continue;
     }
@@ -3361,7 +3424,8 @@ function updateToyHouse(now, delta) {
     );
     const onFloor = toy.body.position.y >= TOY_HOUSE_FLOOR_Y - bodyHeight / 2 - 10;
     const onToyStack = Boolean(getToyHouseStackSupport(toy));
-    const grounded = (onFloor || onCake || onToyStack) && Math.abs(toy.body.velocity.y) < 1.25;
+    const onPlatform = onCake || isToyHouseOnPlatform(toy);
+    const grounded = (onFloor || onPlatform || onToyStack) && Math.abs(toy.body.velocity.y) < 1.25;
 
     if (toy.isPlaced) {
       if (grounded || Math.abs(toy.body.velocity.x) > 0.05 || Math.abs(toy.body.angularVelocity) > 0.01) {
@@ -3371,8 +3435,7 @@ function updateToyHouse(now, delta) {
         });
         Body.setAngularVelocity(toy.body, toy.body.angularVelocity * 0.9);
       }
-      toy.view.position.set(toy.body.position.x, toy.body.position.y);
-      toy.view.rotation = toy.body.angle * 0.18;
+      syncToyHouseTsumView(toy, 0.18, grounded);
       toy.view.zIndex = 12 + toy.body.position.y / 1000;
       if (toy.view._toySprite) {
         const squash = grounded ? 1 : 1 + Math.min(0.06, Math.abs(toy.body.velocity.y) * 0.004);
@@ -3395,8 +3458,7 @@ function updateToyHouse(now, delta) {
     }
 
     if (manualResting) {
-      toy.view.position.set(toy.body.position.x, toy.body.position.y);
-      toy.view.rotation = toy.body.angle * 0.22;
+      syncToyHouseTsumView(toy, 0.16, grounded);
       toy.view.zIndex = 12 + toy.body.position.y / 1000;
       continue;
     }
@@ -3423,12 +3485,11 @@ function updateToyHouse(now, delta) {
         x: toy.body.velocity.x + toy.direction * (0.65 + Math.random() * 0.75),
         y: -4.8 - Math.random() * 2.6,
       });
-      Body.setAngularVelocity(toy.body, toy.body.angularVelocity + toy.direction * 0.05);
+      Body.setAngularVelocity(toy.body, 0);
       toy.nextJumpAt = now + 1300 + Math.random() * 2600;
     }
 
-    toy.view.position.set(toy.body.position.x, toy.body.position.y);
-    toy.view.rotation = toy.body.angle * 0.22;
+    syncToyHouseTsumView(toy, 0.2, grounded);
     toy.view.zIndex = 12 + toy.body.position.y / 1000;
     toy.view.scale.x = Math.abs(toy.view.scale.x) * (toy.direction < 0 ? -1 : 1);
     if (toy.view._toySprite) {
@@ -3510,6 +3571,7 @@ function addToyHouseTsumEntry(entry, index, layout) {
       frictionStatic: 1.08,
       frictionAir: 0.052,
       density: 0.002,
+      inertia: Infinity,
       slop: 0.012,
       chamfer: { radius: 9 },
       collisionFilter: {
