@@ -54,6 +54,7 @@ const LEVELS_PER_PAGE = 10;
 const HERO_PANEL_Y = DESIGN_HEIGHT - 130;
 const INITIAL_BOARD_FILL_TARGET = 32;
 const SPRITE_TEXTURE_SOFT_TIMEOUT_MS = 3600;
+const GAMEPLAY_SPRITE_TEXTURE_TIMEOUT_MS = 0;
 const SCENE_TEXTURE_SOFT_TIMEOUT_MS = 5200;
 const COLLECTION_GRID_BATCH_SIZE = 28;
 const COLLECTION_BATCH_DELAY_MS = 18;
@@ -187,7 +188,59 @@ const TOY_HOUSE_BASE_NAME_ALIASES = {
   "tumper": "Tumper",
 };
 
+const TOY_HOUSE_FUNFAIR_ASSETS_BY_RESOURCE_KEY = {
+  "t_albertoscorfano": "sszdy_assets/Sprite_Sprite_68709.png?v=65",
+  "t_alice": "sszdy_assets/Sprite_Sprite_68736.png?v=65",
+  "t_anna": "sszdy_assets/Sprite_Sprite_68456.png?v=65",
+  "t_beast": "sszdy_assets/Sprite_Sprite_68586.png?v=65",
+  "t_belle": "sszdy_assets/Sprite_Sprite_68604.png?v=65",
+  "t_chip_potts": "sszdy_assets/Sprite_Sprite_68644.png?v=65",
+  "t_cheshire_cat": "sszdy_assets/Sprite_Sprite_68348.png?v=65",
+  "t_clawhauser": "sszdy_assets/Sprite_Sprite_68556.png?v=65",
+  "t_cogsworth": "sszdy_assets/Sprite_Sprite_68629.png?v=65",
+  "t_daisy": "sszdy_assets/Sprite_Sprite_68576.png?v=65",
+  "t_donald": "sszdy_assets/Sprite_Sprite_68520.png?v=65",
+  "t_eeyore": "sszdy_assets/Sprite_Sprite_68694.png?v=65",
+  "t_elsa": "sszdy_assets/Sprite_Sprite_68448.png?v=65",
+  "t_finnick": "sszdy_assets/Sprite_Sprite_68544.png?v=65",
+  "t_flash": "sszdy_assets/Sprite_Sprite_68534.png?v=65",
+  "t_giuliamarcovaldo": "sszdy_assets/Sprite_Sprite_68718.png?v=65",
+  "t_goofy": "sszdy_assets/Sprite_Sprite_68372.png?v=65",
+  "t_judy": "sszdy_assets/Sprite_Sprite_68503.png?v=65",
+  "t_kristoff": "sszdy_assets/Sprite_Sprite_68491.png?v=65",
+  "t_lucapaguro": "sszdy_assets/Sprite_Sprite_68698.png?v=65",
+  "t_lumiere": "sszdy_assets/Sprite_Sprite_68609.png?v=65",
+  "t_mad_hatter": "sszdy_assets/Sprite_Sprite_68334.png?v=65",
+  "t_march_hare": "sszdy_assets/Sprite_Sprite_68410.png?v=65",
+  "t_mickey": "sszdy_assets/Sprite_Sprite_68322.png?v=65",
+  "t_minnie": "sszdy_assets/Sprite_Sprite_68435.png?v=65",
+  "t_mr_big": "sszdy_assets/Sprite_Sprite_68566.png?v=65",
+  "t_mrs_potts": "sszdy_assets/Sprite_Sprite_68630.png?v=65",
+  "t_nick": "sszdy_assets/Sprite_Sprite_68516.png?v=65",
+  "t_olaf": "sszdy_assets/Sprite_Sprite_68467.png?v=65",
+  "t_oyster": "sszdy_assets/Sprite_Sprite_68422.png?v=65",
+  "t_piglet": "sszdy_assets/Sprite_Sprite_68663.png?v=65",
+  "t_pluto": "sszdy_assets/Sprite_Sprite_68379.png?v=65",
+  "t_pooh": "sszdy_assets/Sprite_Sprite_68660.png?v=65",
+  "t_rabbit": "sszdy_assets/Sprite_Sprite_68403.png?v=65",
+  "t_sven": "sszdy_assets/Sprite_Sprite_68476.png?v=65",
+  "t_white_rabbit": "sszdy_assets/Sprite_Sprite_68359.png?v=65",
+};
+
+const TOY_HOUSE_ALBUM_STICKER_ASSETS_BY_RESOURCE_KEY = {
+  "t_angel": "sszdy_assets/Sprite_Sprite_72039.png?v=65",
+  "t_gantu": "sszdy_assets/Sprite_Sprite_72043.png?v=65",
+  "t_jumba": "sszdy_assets/Sprite_Sprite_72024.png?v=65",
+  "t_lilo": "sszdy_assets/Sprite_Sprite_72034.png?v=65",
+  "t_pete": "sszdy_assets/Sprite_Sprite_71991.png?v=65",
+  "t_scrump": "sszdy_assets/Sprite_Sprite_72037.png?v=65",
+  "t_stitch": "sszdy_assets/Sprite_Sprite_72031.png?v=65",
+  "t_syndrome": "sszdy_assets/Sprite_Sprite_72022.png?v=65",
+  "t_uglyduckling": "sszdy_assets/Sprite_Sprite_72026.png?v=65",
+};
+
 const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
+  "alberto scorfano": "sszdy_assets/Sprite_Sprite_68709.png?v=65",
   "alice": "sszdy_assets/Sprite_Sprite_68736.png?v=61",
   "angel": "sszdy_assets/Sprite_Sprite_72039.png?v=64",
   "anna": "sszdy_assets/Sprite_Sprite_68456.png?v=61",
@@ -195,6 +248,7 @@ const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
   "belle": "sszdy_assets/Sprite_Sprite_68604.png?v=61",
   "captain gantu": "sszdy_assets/Sprite_Sprite_72043.png?v=64",
   "cheshire cat": "sszdy_assets/Sprite_Sprite_68348.png?v=61",
+  "chip potts": "sszdy_assets/Sprite_Sprite_68644.png?v=65",
   "clawhauser": "sszdy_assets/Sprite_Sprite_68556.png?v=61",
   "cogsworth": "sszdy_assets/Sprite_Sprite_68629.png?v=61",
   "daisy duck": "sszdy_assets/Sprite_Sprite_68576.png?v=61",
@@ -204,32 +258,33 @@ const TOY_HOUSE_BUCKET_ASSETS_BY_BASE = {
   "elsa": "sszdy_assets/Sprite_Sprite_68448.png?v=61",
   "finnick": "sszdy_assets/Sprite_Sprite_68544.png?v=61",
   "flash": "sszdy_assets/Sprite_Sprite_68534.png?v=61",
-  "friend owl": "sszdy_assets/Sprite_Sprite_72022.png?v=64",
+  "giulia marcovaldo": "sszdy_assets/Sprite_Sprite_68718.png?v=65",
   "goofy": "sszdy_assets/Sprite_Sprite_68372.png?v=61",
-  "hound": "sszdy_assets/Sprite_Sprite_71991.png?v=64",
   "judy hopps": "sszdy_assets/Sprite_Sprite_68503.png?v=64",
   "jumba": "sszdy_assets/Sprite_Sprite_72024.png?v=64",
   "kristoff": "sszdy_assets/Sprite_Sprite_68491.png?v=61",
   "lilo pelekai": "sszdy_assets/Sprite_Sprite_72034.png?v=64",
+  "luca paguro": "sszdy_assets/Sprite_Sprite_68698.png?v=65",
   "lumiere": "sszdy_assets/Sprite_Sprite_68609.png?v=61",
   "mad hatter": "sszdy_assets/Sprite_Sprite_68334.png?v=61",
-  "merida": "sszdy_assets/Sprite_Sprite_68718.png?v=61",
+  "march hare": "sszdy_assets/Sprite_Sprite_68410.png?v=65",
   "mickey mouse": "sszdy_assets/Sprite_Sprite_68322.png?v=61",
   "minnie mouse": "sszdy_assets/Sprite_Sprite_68435.png?v=61",
   "mr big": "sszdy_assets/Sprite_Sprite_68566.png?v=64",
   "mrs potts": "sszdy_assets/Sprite_Sprite_68630.png?v=61",
   "nick wilde": "sszdy_assets/Sprite_Sprite_68516.png?v=61",
   "olaf": "sszdy_assets/Sprite_Sprite_68467.png?v=61",
+  "oyster": "sszdy_assets/Sprite_Sprite_68422.png?v=65",
+  "pete": "sszdy_assets/Sprite_Sprite_71991.png?v=65",
   "piglet": "sszdy_assets/Sprite_Sprite_68663.png?v=61",
   "pluto": "sszdy_assets/Sprite_Sprite_68379.png?v=61",
   "rabbit": "sszdy_assets/Sprite_Sprite_68403.png?v=61",
-  "roo": "sszdy_assets/Sprite_Sprite_71995.png?v=64",
   "scrump": "sszdy_assets/Sprite_Sprite_72037.png?v=64",
   "snow white": "sszdy_assets/Sprite_Sprite_72544.png?v=64",
   "stitch": "sszdy_assets/Sprite_Sprite_72031.png?v=64",
+  "syndrome": "sszdy_assets/Sprite_Sprite_72022.png?v=65",
   "sven": "sszdy_assets/Sprite_Sprite_68476.png?v=61",
   "tigger": "sszdy_assets/Sprite_Sprite_68681.png?v=61",
-  "tumper": "sszdy_assets/Sprite_Sprite_68410.png?v=64",
   "ugly duckling": "sszdy_assets/Sprite_Sprite_72026.png?v=64",
   "white rabbit": "sszdy_assets/Sprite_Sprite_68359.png?v=61",
   "winnie the pooh": "sszdy_assets/Sprite_Sprite_68660.png?v=61",
@@ -1333,7 +1388,10 @@ function warmGameplayTextureWindow() {
 
 async function loadRoundTextures() {
   selectedSpriteIds = pickRoundSprites();
-  const loadedTextures = await loadSpriteTextures(selectedSpriteIds, { fallback: true });
+  const loadedTextures = await loadSpriteTextures(selectedSpriteIds, {
+    fallback: true,
+    timeoutMs: GAMEPLAY_SPRITE_TEXTURE_TIMEOUT_MS,
+  });
 
   textures = selectedSpriteIds.map((id, index) => ({
     id,
@@ -1349,7 +1407,10 @@ async function loadRoundTextures() {
 }
 
 async function loadHeroTexture() {
-  selectedHeroTexture = await loadSpriteTextureWithFallback(selectedHero.assetId);
+  selectedHeroTexture = await loadSpriteTextureWithFallback(
+    selectedHero.assetId,
+    GAMEPLAY_SPRITE_TEXTURE_TIMEOUT_MS,
+  );
   await loadHeroAvatarTexture(selectedHero);
 }
 
@@ -1383,7 +1444,7 @@ async function loadLevelObstacleTextures(level) {
   }
 
   await Promise.all([...assetIds].map(async (id) => {
-    const texture = await loadSpriteTextureWithFallback(id, SPRITE_TEXTURE_SOFT_TIMEOUT_MS).catch(() => null);
+    const texture = await loadSpriteTextureWithFallback(id, GAMEPLAY_SPRITE_TEXTURE_TIMEOUT_MS).catch(() => null);
     if (texture) {
       obstacleTextures.set(id, texture);
     }
@@ -2816,6 +2877,14 @@ function getUnlockedToyHouseSpriteIds() {
 }
 
 function getToyHouseBucketAssetPath(item) {
+  const resourceKey = item?.resourceKey || "";
+  const normalizedResourceKey = normalizeTextKey(resourceKey).replace(/\s+/g, "_");
+  const exactPath = TOY_HOUSE_FUNFAIR_ASSETS_BY_RESOURCE_KEY[normalizedResourceKey]
+    || TOY_HOUSE_ALBUM_STICKER_ASSETS_BY_RESOURCE_KEY[normalizedResourceKey];
+  if (exactPath) {
+    return exactPath;
+  }
+
   const baseName = getToyHouseBaseName(item);
   return TOY_HOUSE_BUCKET_ASSETS_BY_BASE[normalizeTextKey(baseName)] || null;
 }
@@ -4586,7 +4655,10 @@ async function setupBossForLevel() {
   aura.drawCircle(0, 0, 96);
   bossContainer.addChild(aura);
 
-  const texture = await loadSpriteTextureWithFallback(boss.assetId).catch(() => PIXI.Texture.WHITE);
+  const texture = await loadSpriteTextureWithFallback(
+    boss.assetId,
+    GAMEPLAY_SPRITE_TEXTURE_TIMEOUT_MS,
+  ).catch(() => PIXI.Texture.WHITE);
   bossSprite = new PIXI.Sprite(texture);
   bossSprite.anchor.set(0.5);
   bossSprite.width = 156;
@@ -6222,6 +6294,9 @@ window.__tsumDebug = {
     score,
     balls: balls.length,
     selectedSpriteIds: [...selectedSpriteIds],
+    gameplayTextureFallbackIds: textures
+      .filter((entry) => fallbackSpriteTextureCache.get(entry.id) === entry.texture)
+      .map((entry) => entry.id),
     obstacleCount: levelObstacleViews.length,
     obstacleHp: levelObstacleViews.map((view) => view._hp ?? null),
     pendingRefillCount,

@@ -1,8 +1,8 @@
-const CACHE_NAME = "laohu-tsumtsum-v67";
+const CACHE_NAME = "laohu-tsumtsum-v68";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./game.js?v=67",
+  "./game.js?v=68",
   "./manifest.json?v=45",
   "./vendor/pixi.min.js",
   "./vendor/matter.min.js",
