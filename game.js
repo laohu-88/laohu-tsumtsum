@@ -62,6 +62,9 @@ const TOY_HOUSE_ROOM_LOAD_BATCH_SIZE = 8;
 const HOME_HERO_SHORTCUT_COUNT = 3;
 const TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS = 7200;
 
+// Maintenance note: keep this list in sync with character-alignments.json villainIds.
+// If character alignments change, update both data sources together. A future cleanup
+// can make the runtime load this list from JSON instead of maintaining it here.
 const VILLAIN_SPRITE_IDS = [
   19, 22, 34, 37, 39, 42, 55, 63, 67, 72, 73, 74, 75, 80, 82, 90, 105, 121, 139, 141, 147, 183, 199, 203,
   206, 209, 213, 214, 226, 235, 255, 263, 265, 292, 293, 300, 302, 305, 314, 337, 342, 349, 365, 371, 373, 379, 381, 383,
