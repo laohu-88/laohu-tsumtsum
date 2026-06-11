@@ -9,7 +9,7 @@ const BODY_RADIUS = 34;
 const DESIGN_WIDTH = 430;
 const DESIGN_HEIGHT = 932;
 const SPAWN_X_CENTER = DESIGN_WIDTH / 2;
-const SPAWN_X_RANGE = 178;
+const SPAWN_X_RANGE = DESIGN_WIDTH - BALL_RADIUS * 2;
 const SPAWN_Y = 246;
 const SPAWN_MIN_CLEARANCE = BODY_RADIUS * 2.05;
 const MAX_BALLS = 176;
@@ -1145,36 +1145,7 @@ function drawBackground() {
 }
 
 function drawBottle() {
-  const bottle = new PIXI.Graphics();
-
-  bottle.lineStyle(5, 0xeaf8ff, 0.55);
-  bottle.beginFill(0xc7efff, 0.12);
-  bottle.moveTo(BOTTLE.leftNeckTop.x, BOTTLE.leftNeckTop.y);
-  bottle.lineTo(BOTTLE.leftMouth.x, BOTTLE.leftMouth.y);
-  bottle.quadraticCurveTo(100, 270, BOTTLE.leftShoulder.x, BOTTLE.leftShoulder.y);
-  bottle.lineTo(BOTTLE.leftLowerSide.x, BOTTLE.leftLowerSide.y);
-  bottle.quadraticCurveTo(BOTTLE.leftHeel.x, BOTTLE.leftHeel.y, BOTTLE.leftFloor.x, BOTTLE.leftFloor.y);
-  bottle.lineTo(BOTTLE.rightFloor.x, BOTTLE.rightFloor.y);
-  bottle.quadraticCurveTo(BOTTLE.rightHeel.x, BOTTLE.rightHeel.y, BOTTLE.rightLowerSide.x, BOTTLE.rightLowerSide.y);
-  bottle.lineTo(BOTTLE.rightShoulder.x, BOTTLE.rightShoulder.y);
-  bottle.quadraticCurveTo(330, 270, BOTTLE.rightMouth.x, BOTTLE.rightMouth.y);
-  bottle.lineTo(BOTTLE.rightNeckTop.x, BOTTLE.rightNeckTop.y);
-  bottle.moveTo(BOTTLE.leftNeckTop.x, BOTTLE.leftNeckTop.y);
-  bottle.lineTo(BOTTLE.rightNeckTop.x, BOTTLE.rightNeckTop.y);
-  bottle.endFill();
-
-  bottle.lineStyle(2, 0xffffff, 0.28);
-  bottle.moveTo(BOTTLE.leftNeckTop.x + 10, BOTTLE.leftNeckTop.y + 12);
-  bottle.lineTo(BOTTLE.leftMouth.x + 10, BOTTLE.leftMouth.y - 14);
-  bottle.moveTo(BOTTLE.rightNeckTop.x - 10, BOTTLE.rightNeckTop.y + 12);
-  bottle.lineTo(BOTTLE.rightMouth.x - 10, BOTTLE.rightMouth.y - 14);
-  bottle.moveTo(114, 292);
-  bottle.quadraticCurveTo(62, 486, 84, 808);
-  bottle.moveTo(316, 344);
-  bottle.quadraticCurveTo(380, 548, 346, 824);
-
-  bottle.zIndex = 2;
-  app.stage.addChild(bottle);
+  // Bottle outline is intentionally hidden; gameplay now uses screen-edge walls.
 }
 
 function wallFromSegment(start, end, thickness = WALL_THICKNESS) {
@@ -1200,18 +1171,27 @@ function wallFromSegment(start, end, thickness = WALL_THICKNESS) {
 
 function createBottlePhysics() {
   bottleParts = [
-    wallFromSegment(BOTTLE.leftNeckTop, BOTTLE.rightNeckTop),
-    wallFromSegment(BOTTLE.leftNeckTop, BOTTLE.leftMouth),
-    wallFromSegment(BOTTLE.leftMouth, BOTTLE.leftShoulder),
-    wallFromSegment(BOTTLE.leftShoulder, BOTTLE.leftLowerSide),
-    wallFromSegment(BOTTLE.leftLowerSide, BOTTLE.leftHeel),
-    wallFromSegment(BOTTLE.leftHeel, BOTTLE.leftFloor),
-    wallFromSegment(BOTTLE.leftFloor, BOTTLE.rightFloor),
-    wallFromSegment(BOTTLE.rightFloor, BOTTLE.rightHeel),
-    wallFromSegment(BOTTLE.rightHeel, BOTTLE.rightLowerSide),
-    wallFromSegment(BOTTLE.rightLowerSide, BOTTLE.rightShoulder),
-    wallFromSegment(BOTTLE.rightShoulder, BOTTLE.rightMouth),
-    wallFromSegment(BOTTLE.rightMouth, BOTTLE.rightNeckTop),
+    Bodies.rectangle(-WALL_THICKNESS / 2, BOTTOM_SAFE_Y / 2, WALL_THICKNESS, BOTTOM_SAFE_Y + WALL_THICKNESS, {
+      isStatic: true,
+      restitution: 0.34,
+      friction: 0.015,
+      frictionStatic: 0,
+      render: { visible: false },
+    }),
+    Bodies.rectangle(DESIGN_WIDTH + WALL_THICKNESS / 2, BOTTOM_SAFE_Y / 2, WALL_THICKNESS, BOTTOM_SAFE_Y + WALL_THICKNESS, {
+      isStatic: true,
+      restitution: 0.34,
+      friction: 0.015,
+      frictionStatic: 0,
+      render: { visible: false },
+    }),
+    Bodies.rectangle(DESIGN_WIDTH / 2, BOTTOM_SAFE_Y + WALL_THICKNESS / 2, DESIGN_WIDTH + WALL_THICKNESS * 2, WALL_THICKNESS, {
+      isStatic: true,
+      restitution: 0.34,
+      friction: 0.015,
+      frictionStatic: 0,
+      render: { visible: false },
+    }),
   ];
   Composite.add(engine.world, bottleParts);
 }
@@ -1969,32 +1949,9 @@ function spawnBall() {
 }
 
 function getBottleXLimitsAtY(y) {
-  if (y < 246) {
-    return {
-      left: BOTTLE.leftNeckTop.x + BODY_RADIUS,
-      right: BOTTLE.rightNeckTop.x - BODY_RADIUS,
-    };
-  }
-
-  if (y < 360) {
-    const t = (y - BOTTLE.leftMouth.y) / (BOTTLE.leftShoulder.y - BOTTLE.leftMouth.y);
-    return {
-      left: BOTTLE.leftMouth.x + (BOTTLE.leftShoulder.x - BOTTLE.leftMouth.x) * t + BODY_RADIUS,
-      right: BOTTLE.rightMouth.x + (BOTTLE.rightShoulder.x - BOTTLE.rightMouth.x) * t - BODY_RADIUS,
-    };
-  }
-
-  if (y < 806) {
-    const t = (y - BOTTLE.leftShoulder.y) / (BOTTLE.leftLowerSide.y - BOTTLE.leftShoulder.y);
-    return {
-      left: BOTTLE.leftShoulder.x + (BOTTLE.leftLowerSide.x - BOTTLE.leftShoulder.x) * t + BODY_RADIUS,
-      right: BOTTLE.rightShoulder.x + (BOTTLE.rightLowerSide.x - BOTTLE.rightShoulder.x) * t - BODY_RADIUS,
-    };
-  }
-
   return {
-    left: BOTTLE.leftFloor.x + BODY_RADIUS,
-    right: BOTTLE.rightFloor.x - BODY_RADIUS,
+    left: SPAWN_X_CENTER - SPAWN_X_RANGE / 2,
+    right: SPAWN_X_CENTER + SPAWN_X_RANGE / 2,
   };
 }
 
@@ -2108,16 +2065,8 @@ function findOpenSpawnPoint() {
 
 function isOutsideBottleSafetyZone(body) {
   const { x, y } = body.position;
-  if (y < BOTTLE.leftNeckTop.y + BALL_RADIUS) {
+  if (x < -BALL_RADIUS || x > DESIGN_WIDTH + BALL_RADIUS || y < -BALL_RADIUS || y > DESIGN_HEIGHT + BALL_RADIUS) {
     return true;
-  }
-
-  if (x < 4 || x > DESIGN_WIDTH - 4 || y > DESIGN_HEIGHT + BALL_RADIUS) {
-    return true;
-  }
-
-  if (y < 246) {
-    return x < BOTTLE.leftNeckTop.x + BALL_RADIUS || x > BOTTLE.rightNeckTop.x - BALL_RADIUS;
   }
 
   return false;
