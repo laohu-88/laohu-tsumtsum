@@ -83,9 +83,9 @@ const TOY_HOUSE_CAKE_SURFACE_WIDTH = 276;
 const TOY_HOUSE_PLAY_TOP_Y = 190;
 const TOY_HOUSE_MAX_BODY_ANGLE = 0.18;
 const TOY_HOUSE_MAX_VIEW_ROTATION = 0.06;
-const TOY_HOUSE_WALL_CATEGORY = 0x0001;
-const TOY_HOUSE_TOY_CATEGORY = 0x0002;
-const TOY_HOUSE_ROOM_STATIC_CATEGORY = 0x0004;
+const TOY_HOUSE_WALL_CATEGORY = 0x0100;
+const TOY_HOUSE_TOY_CATEGORY = 0x0200;
+const TOY_HOUSE_ROOM_STATIC_CATEGORY = 0x0400;
 
 const TOY_HOUSE_PLATFORM_SURFACES = [
   { x: 154, y: 308, width: 98, height: 16 },
@@ -806,6 +806,8 @@ let toyHouseNextButton = null;
 let toyHouseDrag = null;
 let toyHouseActive = false;
 let toyHouseLoading = false;
+let toyHouseTickerAttached = false;
+let toyHouseLastTimestamp = 0;
 let heroContainer = null;
 let heroSprite = null;
 let heroEnergyBar = null;
@@ -2395,6 +2397,19 @@ function getPointerPosition(event) {
   };
 }
 
+function isToyHouseInputLocked() {
+  return toyHouseActive || toyHouseLoading;
+}
+
+function setLevelSelectInputEnabled(enabled) {
+  if (!levelSelectContainer) {
+    return;
+  }
+
+  levelSelectContainer.eventMode = enabled ? "passive" : "none";
+  levelSelectContainer.interactiveChildren = enabled;
+}
+
 function distanceToSegmentSquared(point, start, end) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
@@ -2688,6 +2703,16 @@ function drawSkillPreview(point) {
 }
 
 function handlePointerDown(event) {
+  if (isToyHouseInputLocked()) {
+    event?.stopPropagation?.();
+    clearSelection();
+    cancelPendingHeroSkill();
+    isDragging = false;
+    lastPointerPosition = null;
+    dragPointerPosition = null;
+    return;
+  }
+
   if (!gameStarted || pausedByMenu) {
     return;
   }
@@ -2719,6 +2744,16 @@ function handlePointerDown(event) {
 }
 
 function handlePointerMove(event) {
+  if (isToyHouseInputLocked()) {
+    event?.stopPropagation?.();
+    clearSelection();
+    cancelPendingHeroSkill();
+    isDragging = false;
+    lastPointerPosition = null;
+    dragPointerPosition = null;
+    return;
+  }
+
   if (!gameStarted || pausedByMenu) {
     clearSelection();
     cancelPendingHeroSkill();
@@ -2748,7 +2783,17 @@ function handlePointerMove(event) {
   redrawConnectionLine();
 }
 
-function handlePointerUp() {
+function handlePointerUp(event) {
+  if (isToyHouseInputLocked()) {
+    event?.stopPropagation?.();
+    clearSelection();
+    cancelPendingHeroSkill();
+    isDragging = false;
+    lastPointerPosition = null;
+    dragPointerPosition = null;
+    return;
+  }
+
   if (!gameStarted || pausedByMenu) {
     clearSelection();
     cancelPendingHeroSkill();
@@ -2986,6 +3031,10 @@ function addToyHouseStaticRect(x, y, width, height, options = {}) {
     restitution: options.restitution ?? 0.04,
     friction: options.friction ?? 0.82,
     frictionStatic: options.frictionStatic ?? 0.86,
+    collisionFilter: {
+      category: options.roomStatic ? TOY_HOUSE_ROOM_STATIC_CATEGORY : TOY_HOUSE_WALL_CATEGORY,
+      mask: TOY_HOUSE_TOY_CATEGORY,
+    },
   };
   if (options.collisionFilter) {
     bodyOptions.collisionFilter = options.collisionFilter;
@@ -3252,6 +3301,24 @@ function createToyHouseHeartBubble(x, y, label = "") {
     life: 54,
     maxLife: 54,
   });
+}
+
+function createToyHouseInputBlocker() {
+  const blocker = new PIXI.Graphics();
+  blocker.beginFill(0x000000, 0.001);
+  blocker.drawRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+  blocker.endFill();
+  blocker.zIndex = 3;
+  blocker.eventMode = "static";
+  blocker.cursor = "default";
+  const stop = (event) => event.stopPropagation();
+  blocker.on("pointerdown", stop);
+  blocker.on("pointermove", stop);
+  blocker.on("pointerup", stop);
+  blocker.on("pointerupoutside", stop);
+  blocker.on("pointercancel", stop);
+  blocker.on("pointertap", stop);
+  return blocker;
 }
 
 function startToyHouseDrag(toy, event) {
@@ -3571,6 +3638,32 @@ function updateToyHouse(now, delta) {
   updateToyHouseEffects();
 }
 
+function runToyHouseTicker() {
+  const now = performance.now();
+  const delta = toyHouseLastTimestamp === 0 ? 0 : now - toyHouseLastTimestamp;
+  toyHouseLastTimestamp = now;
+  updateToyHouse(now, delta);
+}
+
+function startToyHouseTicker() {
+  if (!app?.ticker || toyHouseTickerAttached) {
+    return;
+  }
+
+  toyHouseLastTimestamp = 0;
+  app.ticker.add(runToyHouseTicker);
+  toyHouseTickerAttached = true;
+}
+
+function stopToyHouseTicker() {
+  if (app?.ticker) {
+    app.ticker.remove(runToyHouseTicker);
+    app.ticker.remove(updateToyHouse);
+  }
+  toyHouseTickerAttached = false;
+  toyHouseLastTimestamp = 0;
+}
+
 function clearToyHouseRoom() {
   if (toyHouseDrag) {
     releaseToyHouseDrag();
@@ -3691,8 +3784,14 @@ function addToyHouseTsumEntry(entry, index, layout) {
 }
 
 function destroyToyHouse() {
+  toyHouseActive = false;
+  stopToyHouseTicker();
   clearToyHouseRoom();
   clearToyHouseRoomDecor();
+  if (toyHouseEngine) {
+    Composite.clear(toyHouseEngine.world, false);
+    Engine.clear(toyHouseEngine);
+  }
   if (toyHouseContainer) {
     toyHouseContainer.destroy({ children: true });
     toyHouseContainer = null;
@@ -3710,7 +3809,7 @@ function destroyToyHouse() {
   toyHousePrevButton = null;
   toyHouseNextButton = null;
   toyHouseDrag = null;
-  toyHouseActive = false;
+  setLevelSelectInputEnabled(true);
 }
 
 function closeToyHouse() {
@@ -3805,8 +3904,9 @@ async function showToyHouse() {
   hideResultOverlay();
   hidePauseMenu();
   hideCollectionBook();
-  hideLevelSelect();
   destroyToyHouse();
+  setLevelSelectInputEnabled(false);
+  hideLevelSelect();
 
   toyHouseEngine = Engine.create({
     gravity: { x: 0, y: 0.82, scale: 0.001 },
@@ -3837,6 +3937,7 @@ async function showToyHouse() {
     releaseToyHouseDrag(event);
     event.stopPropagation();
   });
+  toyHouseContainer.on("pointertap", (event) => event.stopPropagation());
 
   try {
     const [backgroundTexture, catalogMap] = await Promise.all([
@@ -3854,6 +3955,8 @@ async function showToyHouse() {
     shade.endFill();
     shade.zIndex = 1;
     toyHouseContainer.addChild(shade);
+
+    toyHouseContainer.addChild(createToyHouseInputBlocker());
 
     drawToyHouseBaseFurniture(toyHouseContainer);
 
@@ -3946,6 +4049,7 @@ async function showToyHouse() {
     updateToyHouseRoomUi();
     app.stage.addChild(toyHouseContainer);
     toyHouseActive = true;
+    startToyHouseTicker();
     if (toyHouseRooms.length) {
       await populateToyHouseRoom(0);
     }
@@ -6220,10 +6324,6 @@ function startTicker() {
     const now = performance.now();
     const delta = lastTimestamp === 0 ? 0 : now - lastTimestamp;
     lastTimestamp = now;
-
-    if (toyHouseActive) {
-      updateToyHouse(now, delta);
-    }
 
     if (gameStarted && !pausedByMenu) {
       if (Number.isFinite(levelTimeLeftMs)) {
