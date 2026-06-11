@@ -2567,7 +2567,7 @@ function triggerPhysicsQuake(origin, chainLength) {
     Body.setAngularVelocity(body, body.angularVelocity + (Math.random() - 0.5) * 0.38);
   }
 
-  triggerVisualShake(24 + chainLength * 2, 14 + chainLength * 1.8);
+  triggerVisualShake(24 + chainLength * 2, 10 + chainLength * 1.2);
 }
 
 function getChainCenter(chain) {
