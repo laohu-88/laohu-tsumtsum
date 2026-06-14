@@ -835,9 +835,39 @@ let levelStats = {
   maxCombo: 0,
   shockClears: 0,
 };
+let levelLoadingShownAt = 0;
 
 const loadingEl = document.getElementById("loading");
 const gameRoot = document.getElementById("game-root");
+
+function showLevelLoading(message = "正在加载关卡资源…") {
+  if (!loadingEl) {
+    return;
+  }
+
+  loadingEl.style.display = "block";
+  loadingEl.style.zIndex = "120";
+  loadingEl.textContent = message;
+  levelLoadingShownAt = performance.now();
+}
+
+function hideLevelLoading() {
+  if (loadingEl) {
+    loadingEl.style.display = "none";
+  }
+  levelLoadingShownAt = 0;
+}
+
+async function waitForLevelLoadingMinimum(minVisibleMs = 240) {
+  if (!levelLoadingShownAt) {
+    return;
+  }
+
+  const elapsed = performance.now() - levelLoadingShownAt;
+  if (elapsed < minVisibleMs) {
+    await new Promise((resolve) => window.setTimeout(resolve, minVisibleMs - elapsed));
+  }
+}
 
 function shuffle(values) {
   const result = [...values];
@@ -2908,7 +2938,6 @@ function buildToyHouseRooms(unlockedIds, catalogMap) {
     const item = getToyHouseCatalogItem(id, catalogMap);
     if (!getToyHouseBucketAssetPath(item)) {
       missingOfficialAssetIds.push(id);
-      continue;
     }
 
     const roomDef = getToyHouseRoomDefinition(item);
@@ -2942,16 +2971,25 @@ async function loadToyHouseTsumTexture(id, catalogMap) {
   const bucketPath = getToyHouseBucketAssetPath(item);
   const name = item.name || `松松 ${id}`;
   const baseName = getToyHouseBaseName(item);
-  if (!bucketPath) {
-    return null;
+
+  if (bucketPath) {
+    const bucketTexture = await loadPixiTextureWithFallback(bucketPath, null, TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS);
+    if (bucketTexture) {
+      return { id, name, baseName, texture: bucketTexture, isBucket: true, isOfficialBucket: true, assetPath: bucketPath };
+    }
   }
 
-  const bucketTexture = await loadPixiTextureWithFallback(bucketPath, null, TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS);
-  if (!bucketTexture) {
-    return null;
-  }
-
-  return { id, name, baseName, texture: bucketTexture, isBucket: true, isOfficialBucket: true, assetPath: bucketPath };
+  const fallbackTexture = await loadSpriteTextureWithFallback(id, TOY_HOUSE_CHARACTER_TEXTURE_TIMEOUT_MS);
+  return {
+    id,
+    name,
+    baseName,
+    texture: fallbackTexture,
+    isBucket: false,
+    isOfficialBucket: false,
+    assetPath: `assets/${normalizeSpriteId(id) || FIRST_SPRITE_ID}.png`,
+    fallbackFromBucket: Boolean(bucketPath),
+  };
 }
 
 function fitToyHouseSprite(sprite, maxWidth, maxHeight) {
@@ -3770,7 +3808,17 @@ function closeToyHouse() {
 }
 
 async function populateToyHouseRoom(roomIndex) {
-  if (!toyHouseContainer || !toyHouseRoomLayer || !toyHouseEngine || !toyHouseRooms.length) {
+  if (!toyHouseContainer || !toyHouseRoomLayer || !toyHouseEngine) {
+    return;
+  }
+
+  if (!toyHouseRooms.length) {
+    toyHouseRoomIndex = 0;
+    toyHouseRoomRenderToken += 1;
+    const token = toyHouseRoomRenderToken;
+    clearToyHouseRoom();
+    updateToyHouseRoomUi();
+    await drawToyHouseRoomDecor(null, token);
     return;
   }
 
@@ -4002,9 +4050,7 @@ async function showToyHouse() {
     app.stage.addChild(toyHouseContainer);
     toyHouseActive = true;
     startToyHouseTicker();
-    if (toyHouseRooms.length) {
-      await populateToyHouseRoom(0);
-    }
+    await populateToyHouseRoom(0);
     warmGameplayTextureWindow();
   } catch (error) {
     destroyToyHouse();
@@ -4414,6 +4460,9 @@ function syncSprites() {
       removeBall(ball, false);
     }
     balls = balls.filter((ball) => !escapedIds.has(ball.body.id));
+    if (gameStarted) {
+      queueRefill(escapedIds.size);
+    }
   }
 
   if (isDragging) {
@@ -4794,10 +4843,13 @@ async function startLevel(level) {
 
   levelStartInProgress = true;
   gameStarted = false;
+  let levelStarted = false;
   try {
     hideLevelSelect();
     hideResultOverlay();
     hidePauseMenu();
+    showLevelLoading("正在加载关卡资源…首次进入可能需要几秒钟…");
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
     currentLevel = level;
     currentLevelTargetSpriteId = null;
     levelTimeLeftMs = Number.isFinite(level.duration) ? level.duration * 1000 : Infinity;
@@ -4829,7 +4881,15 @@ async function startLevel(level) {
     updateHudForLevel();
     updateHeroUi();
     gameStarted = true;
+    levelStarted = true;
+  } catch (error) {
+    showLevelLoading("关卡资源加载失败，请稍后重试。");
+    throw error;
   } finally {
+    if (levelStarted) {
+      await waitForLevelLoadingMinimum();
+      hideLevelLoading();
+    }
     levelStartInProgress = false;
   }
 }
